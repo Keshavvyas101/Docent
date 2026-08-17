@@ -4,7 +4,7 @@ langchain
 langchain-community
 google-generativeai
 sentence-transformers
-chromadb
+qdrant-client
 pydantic
 python-dotenv
 pypdf

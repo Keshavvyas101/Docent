@@ -1,23 +1,24 @@
 """
 Retriever module.
 
-Query the Chroma collection for chunks similar to a user question.
+Query the Qdrant collection for chunks similar to a user question.
 """
 
-import chromadb
+from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 
 from app.config import (
-    CHROMA_PATH,
     COLLECTION_NAME,
     EMBEDDING_MODEL,
+    QDRANT_PATH,
+    QDRANT_URL,
     SIMILARITY_THRESHOLD,
     TOP_K,
 )
 
 # Module-level singletons (loaded once, reused)
 _model: SentenceTransformer | None = None
-_collection: chromadb.Collection | None = None
+_client: QdrantClient | None = None
 
 
 def _get_model() -> SentenceTransformer:
@@ -27,47 +28,48 @@ def _get_model() -> SentenceTransformer:
     return _model
 
 
-def _get_collection() -> chromadb.Collection:
-    global _collection
-    if _collection is None:
-        client = chromadb.PersistentClient(path=str(CHROMA_PATH))
-        _collection = client.get_collection(COLLECTION_NAME)
-    return _collection
+def _get_client() -> QdrantClient:
+    global _client
+    if _client is None:
+        if QDRANT_URL:
+            _client = QdrantClient(url=QDRANT_URL)
+        else:
+            _client = QdrantClient(path=str(QDRANT_PATH))
+    return _client
 
 
 def retrieve(question: str, top_k: int = TOP_K) -> list[dict]:
-    """Retrieve the most relevant chunks for a question.
+    """Retrieve the most relevant chunks for a question from Qdrant.
 
     Returns a list of dicts with 'chunk_id', 'source', 'text', 'score'.
     Score is cosine similarity (higher = more relevant).
     Chunks below SIMILARITY_THRESHOLD are excluded.
     """
     model = _get_model()
-    collection = _get_collection()
+    client = _get_client()
 
-    # Embed the question
-    query_embedding = model.encode([question]).tolist()
+    query_vector = model.encode([question])[0].tolist()
 
-    # Query Chroma (returns distances; cosine distance = 1 - similarity)
-    results = collection.query(
-        query_embeddings=query_embedding,
-        n_results=top_k,
-        include=["documents", "metadatas", "distances"],
+    # Query Qdrant
+    results = client.query_points(
+        collection_name=COLLECTION_NAME,
+        query=query_vector,
+        limit=top_k,
     )
 
     chunks = []
-    for i in range(len(results["ids"][0])):
-        distance = results["distances"][0][i]
-        similarity = 1.0 - distance  # Convert cosine distance to similarity
-
+    for point in results.points:
+        similarity = float(point.score)
         if similarity < SIMILARITY_THRESHOLD:
             continue
 
+        payload = point.payload or {}
         chunks.append({
-            "chunk_id": results["ids"][0][i],
-            "source": results["metadatas"][0][i]["source"],
-            "text": results["documents"][0][i],
+            "chunk_id": payload.get("chunk_id", ""),
+            "source": payload.get("source", ""),
+            "text": payload.get("text", ""),
             "score": round(similarity, 4),
         })
 
     return chunks
+

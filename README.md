@@ -2,32 +2,34 @@
 
 A lightweight grounded documentation knowledge assistant powered by RAG (Retrieval-Augmented Generation).
 
-Docent ingests your documentation files, chunks and embeds them into a vector database, and answers questions with grounded, cited responses using Google's Gemini LLM.
+Docent ingests your documentation files (PDF, Markdown, TXT), chunks and embeds them into a Qdrant vector database, and answers questions with grounded, cited responses using Google's Gemini LLM.
 
 ## Architecture
 
 ```
-Documents (MD/TXT)
+Documents (PDF/MD/TXT)
     ↓
-Text Extraction
+Text Extraction (pypdf for PDF, UTF-8 for MD/TXT)
     ↓
 Chunking (RecursiveCharacterTextSplitter, 500 chars, 50 overlap)
     ↓
-Embeddings (all-MiniLM-L6-v2, CPU)
+Embeddings (all-MiniLM-L6-v2, 384-dim, CPU)
     ↓
-Vector Database (ChromaDB, persistent)
+Vector Database (Qdrant collection "docent_docs")
     ↓
 Similarity Retrieval (cosine, top-4)
     ↓
-Grounding Guardrail (Layer 1: similarity threshold)
+Grounding Guardrail (Layer 1: similarity threshold >= 0.3)
     ↓
-Gemini LLM (gemini-3.6-flash)
+Gemini LLM (gemini-3.5-flash-lite)
     ↓
 Grounding Guardrail (Layer 2: prompt-level INSUFFICIENT_CONTEXT)
     ↓
-Grounded Answer + Citations
+Deterministic Citation Validation against Qdrant metadata
     ↓
-FastAPI POST /ask
+Grounded Answer + Structured Citations
+    ↓
+FastAPI POST /ask & Static UI
 ```
 
 ## Two-Layer Grounding Guardrail
@@ -36,18 +38,21 @@ FastAPI POST /ask
 
 2. **Prompt-level instruction** — Gemini is instructed to respond with `INSUFFICIENT_CONTEXT` if the provided context doesn't support an answer. This catches cases where chunks are retrieved but don't actually answer the question.
 
+3. **Deterministic Citation Validation** — All citations emitted by the LLM are validated against the authoritative retrieved chunks from Qdrant. Fabricated chunk IDs or filenames are rejected automatically.
+
 ## Tech Stack
 
 | Component | Technology |
 |---|---|
-| Language | Python 3.10+ |
+| Language | Python 3.14+ |
 | Web Framework | FastAPI |
-| LLM | Google Gemini (gemini-3.6-flash) |
-| Embeddings | sentence-transformers (all-MiniLM-L6-v2, CPU) |
-| Vector DB | ChromaDB (persistent, local) |
-| Orchestration | LangChain (text splitters) |
-| Validation | Pydantic |
-| Config | python-dotenv |
+| LLM | Google Gemini (`gemini-3.5-flash-lite`) |
+| Embeddings | sentence-transformers (`all-MiniLM-L6-v2`, CPU) |
+| Vector DB | **Qdrant** (local storage / `qdrant-client` / Docker) |
+| Orchestration | LangChain (`langchain-text-splitters`) |
+| PDF Extraction | `pypdf` |
+| Validation | Pydantic v2 |
+| Config | `python-dotenv` |
 
 ## Quick Start
 
@@ -73,30 +78,40 @@ cp .env.example .env
 # Edit .env and add your Gemini API key
 ```
 
-### 3. Ingest Documents
+### 3. Running Qdrant (Docker or Local Embedded)
 
-Place `.md` or `.txt` files in the `data/` directory, then run:
+**Option A (Docker Compose):**
+```bash
+docker compose up -d
+```
+
+**Option B (Embedded Local Storage):**
+Docent automatically falls back to local persistent disk storage in `./qdrant_storage` if `QDRANT_URL` is not set.
+
+### 4. Ingest Documents
+
+Place `.pdf`, `.md`, or `.txt` files in the `data/` directory, then run:
 
 ```bash
 python -m app.ingest
 ```
 
-This will chunk, embed, and store all documents in the persistent Chroma collection.
+This will chunk, embed, and store all documents in the Qdrant `docent_docs` collection.
 
-### 4. Start the Server
+### 5. Start the Server
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 5. Ask Questions
+### 6. Ask Questions
 
 **Via curl:**
 
 ```bash
 curl -X POST http://localhost:8000/ask \
   -H "Content-Type: application/json" \
-  -d '{"question": "What embedding model does Docent use?"}'
+  -d '{"question": "What data encryption standards are enforced by Docent?"}'
 ```
 
 **Via Swagger UI:**
@@ -107,28 +122,29 @@ Open http://localhost:8000/docs in your browser.
 
 ```json
 {
-  "answer": "Docent uses the all-MiniLM-L6-v2 model from sentence-transformers.",
+  "answer": "Docent enforces AES-256 encryption at rest for all stored vector embeddings in ChromaDB.",
   "citations": [
     {
-      "source": "chunking_and_embedding.md",
-      "chunk_id": "chunking_and_embedding_chunk_3",
-      "text": "Each text chunk is converted to a 384-dimensional dense vector...",
-      "relevance_score": 0.4801
+      "source": "security_policy.pdf",
+      "chunk_id": "security_policy_chunk_0",
+      "quote": "Docent enforces AES-256 encryption at rest for all stored vector embeddings and document metadata in ChromaDB."
     }
   ],
   "grounded": true
 }
 ```
 
-### Ungrounded Response
+### Evaluation & Benchmarking
 
-```json
-{
-  "answer": "I don't have enough grounding in the documents to answer that.",
-  "citations": [],
-  "grounded": false
-}
+Run the deterministic retrieval benchmark against the golden evaluation set:
+
+```bash
+python eval/evaluate_retrieval.py
 ```
+
+Current Baseline Performance:
+- **Hit Rate @ 4**: 100.00% (18/18 answerable questions)
+- **Layer 1 Refusal**: 75.00% (3/4 unanswerable questions)
 
 ## Project Structure
 
@@ -136,57 +152,29 @@ Open http://localhost:8000/docs in your browser.
 docent/
 ├── app/
 │   ├── __init__.py          # Package init
-│   ├── config.py            # Configuration (env vars, constants)
-│   ├── ingest.py            # Document loading, chunking, embedding, storage
-│   ├── retriever.py         # Similarity search against Chroma
-│   ├── generator.py         # Gemini generation with grounding prompt
+│   ├── config.py            # Configuration (env vars, Qdrant path/url, constants)
+│   ├── ingest.py            # Load PDF/MD/TXT -> chunk -> embed -> store in Qdrant
+│   ├── retriever.py         # Cosine similarity search against Qdrant
+│   ├── generator.py         # Gemini JSON generation with citation validation
 │   ├── pipeline.py          # End-to-end ask() with two-layer guardrail
-│   ├── models.py            # Pydantic request/response models
+│   ├── models.py            # Pydantic AskRequest, Citation, AskResponse models
 │   └── main.py              # FastAPI application
 ├── data/                    # Documentation files to ingest
 │   ├── sample.md
 │   ├── api_reference.md
 │   ├── deployment_guide.md
-│   └── chunking_and_embedding.md
-├── scripts/
-│   └── 01_ingest_test.py    # Chunking test script
-├── chroma_data/             # Persistent vector store (generated)
+│   ├── chunking_and_embedding.md
+│   └── security_policy.pdf
+├── eval/
+│   ├── golden_set.json      # 22 evaluation questions
+│   └── evaluate_retrieval.py # Hit Rate @ 4 benchmark runner
+├── static/
+│   └── index.html           # Minimal dark-theme UI
+├── qdrant_storage/          # Persistent Qdrant local storage
+├── docker-compose.yml       # Qdrant vector database container setup
 ├── .env                     # API keys (not committed)
 ├── .env.example             # Template for .env
 ├── .gitignore
 ├── requirements.txt
 └── README.md
 ```
-
-## API Endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/ask` | Ask a question, get a grounded answer |
-| GET | `/health` | Health check |
-| GET | `/docs` | Swagger UI |
-
-## Configuration
-
-| Variable | Description | Default |
-|---|---|---|
-| `GEMINI_API_KEY` | Google Gemini API key | (required) |
-
-Internal constants are in `app/config.py`:
-
-| Constant | Value | Purpose |
-|---|---|---|
-| `CHUNK_SIZE` | 500 | Characters per chunk |
-| `CHUNK_OVERLAP` | 50 | Overlap between chunks |
-| `EMBEDDING_MODEL` | all-MiniLM-L6-v2 | Sentence transformer model |
-| `COLLECTION_NAME` | docent_docs | Chroma collection name |
-| `TOP_K` | 4 | Number of chunks to retrieve |
-| `SIMILARITY_THRESHOLD` | 0.3 | Minimum cosine similarity |
-
-## Known Limitations
-
-- Uses the deprecated `google.generativeai` package (functional but will need migration to `google.genai`)
-- No PDF support yet (MD and TXT only)
-- No authentication on the API
-- No conversation memory (single-turn only)
-- Embedding model loaded on first request (cold start ~2-3s)

@@ -11,7 +11,8 @@ load_dotenv(_PROJECT_ROOT / ".env")
 
 # Paths
 DATA_DIR = _PROJECT_ROOT / "data"
-CHROMA_PATH = _PROJECT_ROOT / "chroma_data"
+QDRANT_PATH = _PROJECT_ROOT / "qdrant_storage"
+QDRANT_URL = os.getenv("QDRANT_URL", "")
 
 # Embedding model
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
@@ -20,7 +21,7 @@ EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
-# Chroma
+# Vector DB
 COLLECTION_NAME = "docent_docs"
 
 # Retrieval

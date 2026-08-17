@@ -1,28 +1,31 @@
-"""
-Document ingestion pipeline.
-
-Load documents from data/, chunk them, embed with sentence-transformers,
-and store in a persistent Chroma collection.
-"""
-
+import uuid
 from pathlib import Path
 
-import chromadb
 import pypdf
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, PointStruct, VectorParams
 from sentence_transformers import SentenceTransformer
 
 from app.config import (
-    CHROMA_PATH,
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     COLLECTION_NAME,
     DATA_DIR,
     EMBEDDING_MODEL,
+    QDRANT_PATH,
+    QDRANT_URL,
 )
 
 # Supported file extensions
 SUPPORTED_EXTENSIONS = {".md", ".txt", ".pdf"}
+
+
+def get_qdrant_client() -> QdrantClient:
+    """Get Qdrant client connected to server URL or local path."""
+    if QDRANT_URL:
+        return QdrantClient(url=QDRANT_URL)
+    return QdrantClient(path=str(QDRANT_PATH))
 
 
 def extract_pdf_text(filepath: Path) -> str:
@@ -79,7 +82,7 @@ def chunk_documents(docs: list[dict]) -> list[dict]:
 
 
 def embed_and_store(chunks: list[dict]) -> int:
-    """Embed chunks and store them in persistent Chroma.
+    """Embed chunks and store them in persistent Qdrant.
 
     Returns the total number of documents in the collection after insertion.
     """
@@ -90,32 +93,39 @@ def embed_and_store(chunks: list[dict]) -> int:
     texts = [c["text"] for c in chunks]
     embeddings = model.encode(texts, show_progress_bar=True).tolist()
 
-    # Persistent Chroma client
-    client = chromadb.PersistentClient(path=str(CHROMA_PATH))
+    client = get_qdrant_client()
 
-    # Delete existing collection if present (clean re-ingest)
-    try:
+    # Re-create collection
+    if client.collection_exists(COLLECTION_NAME):
         client.delete_collection(COLLECTION_NAME)
-    except Exception:
-        pass
 
-    collection = client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        metadata={"hnsw:space": "cosine"},
+    client.create_collection(
+        collection_name=COLLECTION_NAME,
+        vectors_config=VectorParams(size=384, distance=Distance.COSINE),
     )
+
+    points = []
+    for idx, c in enumerate(chunks):
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, c["chunk_id"]))
+        points.append(
+            PointStruct(
+                id=point_id,
+                vector=embeddings[idx],
+                payload={
+                    "chunk_id": c["chunk_id"],
+                    "source": c["source"],
+                    "text": c["text"],
+                },
+            )
+        )
 
     # Insert in batches of 100
     batch_size = 100
-    for start in range(0, len(chunks), batch_size):
-        end = min(start + batch_size, len(chunks))
-        collection.add(
-            ids=[c["chunk_id"] for c in chunks[start:end]],
-            embeddings=embeddings[start:end],
-            documents=[c["text"] for c in chunks[start:end]],
-            metadatas=[{"source": c["source"]} for c in chunks[start:end]],
-        )
+    for start in range(0, len(points), batch_size):
+        end = min(start + batch_size, len(points))
+        client.upsert(collection_name=COLLECTION_NAME, points=points[start:end])
 
-    return collection.count()
+    return client.get_collection(COLLECTION_NAME).points_count
 
 
 def run_ingest() -> int:
@@ -131,12 +141,13 @@ def run_ingest() -> int:
     chunks = chunk_documents(docs)
     print(f"  Created {len(chunks)} chunk(s)")
 
-    print("Embedding and storing in Chroma...")
+    print("Embedding and storing in Qdrant...")
     count = embed_and_store(chunks)
-    print(f"  Chroma collection '{COLLECTION_NAME}' now has {count} document(s)")
+    print(f"  Qdrant collection '{COLLECTION_NAME}' now has {count} document(s)")
 
     return count
 
 
 if __name__ == "__main__":
     run_ingest()
+
