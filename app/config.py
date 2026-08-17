@@ -13,6 +13,8 @@ load_dotenv(_PROJECT_ROOT / ".env")
 DATA_DIR = _PROJECT_ROOT / "data"
 QDRANT_PATH = _PROJECT_ROOT / "qdrant_storage"
 QDRANT_URL = os.getenv("QDRANT_URL", "")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", "")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", os.getenv("CORS_ORIGIN", "*"))
 
 # Embedding model
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"

@@ -31,18 +31,23 @@ def _coll() -> str:
 def get_qdrant_client() -> QdrantClient:
     """Return the shared Qdrant client, creating it on first call.
 
-    Uses ``QDRANT_URL`` from config if set (Docker / server mode), otherwise
-    falls back to local embedded storage at ``QDRANT_PATH``.\n
+    Uses ``QDRANT_URL`` from config if set (Docker / server / Qdrant Cloud mode),
+    otherwise falls back to local embedded storage at ``QDRANT_PATH``. Passes
+    ``QDRANT_API_KEY`` if provided.
     Call ``reset_qdrant_client()`` to force re-creation (e.g. in tests).
     """
     global _client
     if _client is None:
         import app.config as cfg
         if cfg.QDRANT_URL:
-            _client = QdrantClient(url=cfg.QDRANT_URL)
+            kwargs = {"url": cfg.QDRANT_URL}
+            if cfg.QDRANT_API_KEY:
+                kwargs["api_key"] = cfg.QDRANT_API_KEY
+            _client = QdrantClient(**kwargs)
         else:
             _client = QdrantClient(path=str(cfg.QDRANT_PATH))
     return _client
+
 
 
 def reset_qdrant_client() -> None:
@@ -55,13 +60,22 @@ def reset_qdrant_client() -> None:
 
 
 def ensure_collection_exists(client: QdrantClient) -> None:
-    """Ensure Qdrant collection exists without deleting existing data."""
+    """Ensure Qdrant collection exists and has keyword index on payload field 'source'."""
     coll = _coll()
     if not client.collection_exists(coll):
         client.create_collection(
             collection_name=coll,
             vectors_config=VectorParams(size=384, distance=Distance.COSINE),
         )
+    try:
+        client.create_payload_index(
+            collection_name=coll,
+            field_name="source",
+            field_schema="keyword",
+        )
+    except Exception:
+        pass
+
 
 
 def compute_file_hash(filepath: Path) -> str:
