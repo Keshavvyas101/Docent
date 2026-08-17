@@ -1,0 +1,297 @@
+{
+  "recall_at_4": 0.02,
+  "recall_at_10": 0.02,
+  "recall_at_20": 0.03,
+  "failed_query_inspection": [
+    {
+      "query_index": 1,
+      "query": "What is the default connection timeout setting for OAuth2 & JWT Security Protocols?",
+      "expected_source": "synthetic_doc_0001.md",
+      "expected_fact": "4606",
+      "expected_rank_in_top_20": null,
+      "top_4_retrieved": [
+        {
+          "source": "synthetic_doc_7085.md",
+          "score": 0.8287,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for OAuth2 & JWT Security Protocol"
+        },
+        {
+          "source": "synthetic_doc_6643.md",
+          "score": 0.8283,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for OAuth2 & JWT Security Protocol"
+        },
+        {
+          "source": "synthetic_doc_0066.md",
+          "score": 0.8282,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for OAuth2 & JWT Security Protocol"
+        },
+        {
+          "source": "synthetic_doc_1601.md",
+          "score": 0.8279,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for OAuth2 & JWT Security Protocol"
+        }
+      ]
+    },
+    {
+      "query_index": 2,
+      "query": "What is the default connection timeout setting for Database Sharding & Replication?",
+      "expected_source": "synthetic_doc_0002.md",
+      "expected_fact": "3682",
+      "expected_rank_in_top_20": null,
+      "top_4_retrieved": [
+        {
+          "source": "synthetic_doc_2371.md",
+          "score": 0.8547,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Database Sharding & Replicatio"
+        },
+        {
+          "source": "synthetic_doc_2407.md",
+          "score": 0.8514,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Database Sharding & Replicatio"
+        },
+        {
+          "source": "synthetic_doc_0374.md",
+          "score": 0.8505,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Database Sharding & Replicatio"
+        },
+        {
+          "source": "synthetic_doc_6951.md",
+          "score": 0.8488,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Database Sharding & Replicatio"
+        }
+      ]
+    },
+    {
+      "query_index": 3,
+      "query": "What is the default connection timeout setting for HNSW Vector Indexing & Distance Metrics?",
+      "expected_source": "synthetic_doc_0003.md",
+      "expected_fact": "2715",
+      "expected_rank_in_top_20": null,
+      "top_4_retrieved": [
+        {
+          "source": "synthetic_doc_6491.md",
+          "score": 0.8228,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for HNSW Vector Indexing & Distanc"
+        },
+        {
+          "source": "synthetic_doc_2939.md",
+          "score": 0.8217,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for HNSW Vector Indexing & Distanc"
+        },
+        {
+          "source": "synthetic_doc_2624.md",
+          "score": 0.8215,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for HNSW Vector Indexing & Distanc"
+        },
+        {
+          "source": "synthetic_doc_0541.md",
+          "score": 0.8202,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for HNSW Vector Indexing & Distanc"
+        }
+      ]
+    },
+    {
+      "query_index": 4,
+      "query": "What is the default connection timeout setting for Redis Cluster In-Memory Caching?",
+      "expected_source": "synthetic_doc_0004.md",
+      "expected_fact": "811",
+      "expected_rank_in_top_20": null,
+      "top_4_retrieved": [
+        {
+          "source": "synthetic_doc_1103.md",
+          "score": 0.8795,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Redis Cluster In-Memory Cachin"
+        },
+        {
+          "source": "synthetic_doc_1596.md",
+          "score": 0.8788,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Redis Cluster In-Memory Cachin"
+        },
+        {
+          "source": "synthetic_doc_1499.md",
+          "score": 0.8787,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Redis Cluster In-Memory Cachin"
+        },
+        {
+          "source": "synthetic_doc_3062.md",
+          "score": 0.8769,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Redis Cluster In-Memory Cachin"
+        }
+      ]
+    },
+    {
+      "query_index": 5,
+      "query": "What is the default connection timeout setting for Kubernetes Horizontal Pod Autoscaling?",
+      "expected_source": "synthetic_doc_0005.md",
+      "expected_fact": "1407",
+      "expected_rank_in_top_20": null,
+      "top_4_retrieved": [
+        {
+          "source": "synthetic_doc_2273.md",
+          "score": 0.8715,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Kubernetes Horizontal Pod Auto"
+        },
+        {
+          "source": "synthetic_doc_6998.md",
+          "score": 0.8701,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Kubernetes Horizontal Pod Auto"
+        },
+        {
+          "source": "synthetic_doc_6937.md",
+          "score": 0.8683,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Kubernetes Horizontal Pod Auto"
+        },
+        {
+          "source": "synthetic_doc_5163.md",
+          "score": 0.8678,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Kubernetes Horizontal Pod Auto"
+        }
+      ]
+    },
+    {
+      "query_index": 6,
+      "query": "What is the default connection timeout setting for HNSW Vector Indexing & Distance Metrics?",
+      "expected_source": "synthetic_doc_0006.md",
+      "expected_fact": "2903",
+      "expected_rank_in_top_20": null,
+      "top_4_retrieved": [
+        {
+          "source": "synthetic_doc_6491.md",
+          "score": 0.8228,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for HNSW Vector Indexing & Distanc"
+        },
+        {
+          "source": "synthetic_doc_2939.md",
+          "score": 0.8217,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for HNSW Vector Indexing & Distanc"
+        },
+        {
+          "source": "synthetic_doc_2624.md",
+          "score": 0.8215,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for HNSW Vector Indexing & Distanc"
+        },
+        {
+          "source": "synthetic_doc_0541.md",
+          "score": 0.8202,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for HNSW Vector Indexing & Distanc"
+        }
+      ]
+    },
+    {
+      "query_index": 7,
+      "query": "What is the default connection timeout setting for Database Sharding & Replication?",
+      "expected_source": "synthetic_doc_0007.md",
+      "expected_fact": "6672",
+      "expected_rank_in_top_20": null,
+      "top_4_retrieved": [
+        {
+          "source": "synthetic_doc_2371.md",
+          "score": 0.8547,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Database Sharding & Replicatio"
+        },
+        {
+          "source": "synthetic_doc_2407.md",
+          "score": 0.8514,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Database Sharding & Replicatio"
+        },
+        {
+          "source": "synthetic_doc_0374.md",
+          "score": 0.8505,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Database Sharding & Replicatio"
+        },
+        {
+          "source": "synthetic_doc_6951.md",
+          "score": 0.8488,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Database Sharding & Replicatio"
+        }
+      ]
+    },
+    {
+      "query_index": 8,
+      "query": "What is the default connection timeout setting for Distributed Event Streaming with Kafka?",
+      "expected_source": "synthetic_doc_0008.md",
+      "expected_fact": "2387",
+      "expected_rank_in_top_20": null,
+      "top_4_retrieved": [
+        {
+          "source": "synthetic_doc_5899.md",
+          "score": 0.8714,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Distributed Event Streaming wi"
+        },
+        {
+          "source": "synthetic_doc_0043.md",
+          "score": 0.8712,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Distributed Event Streaming wi"
+        },
+        {
+          "source": "synthetic_doc_0726.md",
+          "score": 0.871,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Distributed Event Streaming wi"
+        },
+        {
+          "source": "synthetic_doc_5191.md",
+          "score": 0.871,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for Distributed Event Streaming wi"
+        }
+      ]
+    },
+    {
+      "query_index": 9,
+      "query": "What is the default connection timeout setting for OAuth2 & JWT Security Protocols?",
+      "expected_source": "synthetic_doc_0009.md",
+      "expected_fact": "1896",
+      "expected_rank_in_top_20": null,
+      "top_4_retrieved": [
+        {
+          "source": "synthetic_doc_7085.md",
+          "score": 0.8287,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for OAuth2 & JWT Security Protocol"
+        },
+        {
+          "source": "synthetic_doc_6643.md",
+          "score": 0.8283,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for OAuth2 & JWT Security Protocol"
+        },
+        {
+          "source": "synthetic_doc_0066.md",
+          "score": 0.8282,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for OAuth2 & JWT Security Protocol"
+        },
+        {
+          "source": "synthetic_doc_1601.md",
+          "score": 0.8279,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for OAuth2 & JWT Security Protocol"
+        }
+      ]
+    },
+    {
+      "query_index": 10,
+      "query": "What is the default connection timeout setting for gRPC Microservices & Protocol Buffers?",
+      "expected_source": "synthetic_doc_0010.md",
+      "expected_fact": "1976",
+      "expected_rank_in_top_20": null,
+      "top_4_retrieved": [
+        {
+          "source": "synthetic_doc_3362.md",
+          "score": 0.8782,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for gRPC Microservices & Protocol "
+        },
+        {
+          "source": "synthetic_doc_4016.md",
+          "score": 0.8778,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for gRPC Microservices & Protocol "
+        },
+        {
+          "source": "synthetic_doc_3157.md",
+          "score": 0.877,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for gRPC Microservices & Protocol "
+        },
+        {
+          "source": "synthetic_doc_3010.md",
+          "score": 0.8759,
+          "text_snippet": "## 2. Configuration Parameters  - **Timeout**: The default connection timeout setting for gRPC Microservices & Protocol "
+        }
+      ]
+    }
+  ]
+}
