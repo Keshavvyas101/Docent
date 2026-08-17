@@ -776,27 +776,39 @@ uploadBtn.addEventListener('click', async () => {
             const msg = await friendlyError(res);
             const pretty = res.status === 422
                 ? `Unsupported file type. Please upload a .pdf, .md, or .txt file.`
+                : res.status === 409
+                ? `Conflict: ${msg}`
                 : res.status === 400
                 ? `Invalid filename: ${msg}`
                 : `Upload failed: ${msg}`;
             showUploadStatus(pretty, 'error');
+            uploadInProgress = false;
+            uploadBtnText.textContent = 'Upload';
+            uploadSpinner.style.display = 'none';
             return;
         }
 
         const data = await res.json();
-        const { label, cls } = statusLabel(data.status);
-        const msg = data.status === 'unchanged'
-            ? `"${data.filename}" is already up-to-date (${data.chunks_indexed} chunks).`
-            : `"${data.filename}" ${label.toLowerCase()} — ${data.chunks_indexed} chunk(s) indexed.`;
-        showUploadStatus(msg, cls);
 
         // Reset picker
         fileInput.value = '';
         selectedFileLabel.style.display = 'none';
-        uploadBtn.disabled = true;
 
-        // Refresh list
-        await loadDocuments();
+        if (data.job_id) {
+            showUploadStatus(`Queued: Ingestion starting for "${data.filename}"…`, 'warning');
+            await pollJob(data.job_id, data.filename);
+        } else {
+            const { label, cls } = statusLabel(data.status);
+            const count = data.chunks_indexed ?? data.chunks_processed ?? 0;
+            const msg = data.status === 'unchanged'
+                ? `"${data.filename}" is already up-to-date (${count} chunks).`
+                : `"${data.filename}" ${label.toLowerCase()} — ${count} chunk(s) indexed.`;
+            showUploadStatus(msg, cls);
+            await loadDocuments();
+            uploadInProgress = false;
+            uploadBtnText.textContent = 'Upload';
+            uploadSpinner.style.display = 'none';
+        }
 
     } catch (err) {
         const isNetErr = err instanceof TypeError;
@@ -804,12 +816,56 @@ uploadBtn.addEventListener('click', async () => {
             isNetErr ? 'Network error — is the server running?' : `Upload failed: ${err.message}`,
             'error'
         );
-    } finally {
         uploadInProgress = false;
         uploadBtnText.textContent = 'Upload';
         uploadSpinner.style.display = 'none';
     }
 });
+
+async function pollJob(jobId, filename) {
+    const pollInterval = 800;
+    while (true) {
+        try {
+            const res = await fetch(`/documents/jobs/${jobId}`);
+            if (!res.ok) {
+                showUploadStatus(`Failed to poll job status (HTTP ${res.status}).`, 'error');
+                break;
+            }
+            const job = await res.json();
+
+            if (job.status === 'queued') {
+                showUploadStatus(`Queued: Waiting to process "${filename}"…`, 'warning');
+            } else if (job.status === 'processing') {
+                const total = job.total_chunks || 0;
+                const done = job.chunks_processed || 0;
+                const pct = job.progress || 0;
+                const detail = total > 0 ? `Embedding chunks: ${done} / ${total} (${pct}%)` : `Processing…`;
+                showUploadStatus(`Processing "${filename}" — ${detail}`, 'warning');
+            } else if (job.status === 'completed') {
+                const { label, cls } = statusLabel(job.result_status || 'ingested');
+                const count = job.chunks_indexed ?? job.chunks_processed ?? job.total_chunks ?? 0;
+                const msg = job.result_status === 'unchanged'
+                    ? `"${filename}" is already up-to-date (${count} chunks).`
+                    : `"${filename}" ${label.toLowerCase()} — ${count} chunk(s) indexed.`;
+                showUploadStatus(msg, cls);
+                await loadDocuments();
+                break;
+            } else if (job.status === 'failed') {
+                showUploadStatus(`Ingestion failed for "${filename}": ${job.error || 'Unknown error'}`, 'error');
+                break;
+            }
+        } catch (err) {
+            showUploadStatus(`Polling error: ${err.message}`, 'error');
+            break;
+        }
+        await new Promise(r => setTimeout(r, pollInterval));
+    }
+
+    uploadInProgress = false;
+    uploadBtnText.textContent = 'Upload';
+    uploadSpinner.style.display = 'none';
+}
+
 
 // ── Document list ─────────────────────────────────────────────────────────────
 

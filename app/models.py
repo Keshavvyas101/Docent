@@ -68,12 +68,14 @@ class JobStatusResponse(BaseModel):
     progress: int = Field(0, description="Percentage complete (0 to 100)")
     chunks_processed: int = Field(0, description="Number of chunks currently processed")
     total_chunks: int = Field(0, description="Total estimated chunks to process")
+    chunks_indexed: int = Field(0, description="Total number of chunks indexed when completed")
     created_at: str = Field(..., description="ISO 8601 creation timestamp")
     completed_at: str | None = Field(None, description="ISO 8601 completion timestamp")
     error: str | None = Field(None, description="Error message if status is 'failed'")
     result_status: str | None = Field(
         None, description="'ingested' | 'updated' | 'unchanged' when completed"
     )
+
 
 
 class JobListResponse(BaseModel):

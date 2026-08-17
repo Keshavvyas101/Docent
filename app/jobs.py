@@ -34,6 +34,7 @@ class IngestionJob:
         self.result_status: Optional[str] = None
 
     def to_response(self) -> JobStatusResponse:
+        chunks_count = self.chunks_processed or self.total_chunks
         return JobStatusResponse(
             job_id=self.job_id,
             filename=self.filename,
@@ -41,11 +42,13 @@ class IngestionJob:
             progress=self.progress,
             chunks_processed=self.chunks_processed,
             total_chunks=self.total_chunks,
+            chunks_indexed=chunks_count,
             created_at=self.created_at,
             completed_at=self.completed_at,
             error=self.error,
             result_status=self.result_status,
         )
+
 
 
 class JobManager:
