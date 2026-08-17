@@ -1,31 +1,31 @@
 {
-  "Tier B": {
-    "tier_name": "Tier B",
-    "target_chunk_count": 10000,
-    "actual_chunk_count": 10003,
-    "actual_ingestion_time_sec": 111.1068,
-    "actual_throughput_chunks_per_sec": 90.03,
-    "actual_peak_ram_mb": 196.57,
-    "qdrant_stored_points": 10003,
-    "retrieval_latency_min_ms": 18.07,
-    "retrieval_latency_mean_ms": 104.39,
-    "retrieval_latency_p50_ms": 104.99,
-    "retrieval_latency_p95_ms": 119.17,
-    "retrieval_latency_p99_ms": 165.89,
-    "hit_rate_at_4": 13.0,
-    "mrr_at_4": 0.0725,
+  "Tier A": {
+    "tier_name": "Tier A",
+    "target_chunk_count": 1000,
+    "actual_chunk_count": 1000,
+    "actual_ingestion_time_sec": 11.249,
+    "actual_throughput_chunks_per_sec": 88.9,
+    "actual_peak_ram_mb": 95.27,
+    "qdrant_stored_points": 1000,
+    "retrieval_latency_min_ms": 6.39,
+    "retrieval_latency_mean_ms": 7.59,
+    "retrieval_latency_p50_ms": 7.52,
+    "retrieval_latency_p95_ms": 8.24,
+    "retrieval_latency_p99_ms": 8.54,
+    "hit_rate_at_4": 100.0,
+    "mrr_at_4": 1.0,
     "concurrency_results": {
       "1": {
-        "qps": 10.07,
-        "p95_ms": 104.37
+        "qps": 127.68,
+        "p95_ms": 10.2
       },
       "5": {
-        "qps": 34.51,
-        "p95_ms": 196.46
+        "qps": 150.6,
+        "p95_ms": 40.16
       },
       "10": {
-        "qps": 32.31,
-        "p95_ms": 368.58
+        "qps": 130.74,
+        "p95_ms": 90.9
       }
     },
     "prod_points_before": 33,

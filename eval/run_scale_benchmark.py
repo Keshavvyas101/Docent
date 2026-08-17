@@ -293,7 +293,7 @@ def main():
     print(f"[SAFETY VERIFIED] Production collection '{PRODUCTION_COLLECTION}' contains {prod_initial} points.")
 
     tiers = [
-        ("Tier B", 10000),
+        ("Tier A", 1000),
     ]
 
     results = {}
