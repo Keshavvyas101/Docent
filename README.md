@@ -78,11 +78,20 @@ cp .env.example .env
 # Edit .env and add your Gemini API key
 ```
 
-### 3. Running Qdrant (Docker or Local Embedded)
+### 3. Running via Docker Compose (Recommended Container Setup)
 
-**Option A (Docker Compose):**
+Build and start the complete application stack (FastAPI `docent-api` + `qdrant` vector database):
+
 ```bash
-docker compose up -d
+docker compose up --build -d
+# or podman-compose up --build -d
+```
+
+Ingest documents inside the containerized API:
+
+```bash
+docker exec docent-api python -m app.ingest
+# or podman exec docent-api python -m app.ingest
 ```
 
 **Option B (Embedded Local Storage):**

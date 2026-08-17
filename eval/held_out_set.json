@@ -1,0 +1,124 @@
+[
+  {
+    "id": "ho_q1",
+    "category": "paraphrased",
+    "question": "How large are the text snippets when Docent breaks down markdown files?",
+    "expected_answerable": true,
+    "expected_source": "chunking_and_embedding.md",
+    "short_expected_answer": "500 characters max per chunk"
+  },
+  {
+    "id": "ho_q2",
+    "category": "paraphrased",
+    "question": "What hardware specs do I need to run this assistant on my laptop?",
+    "expected_answerable": true,
+    "expected_source": "deployment_guide.md",
+    "short_expected_answer": "Minimum 4 GB RAM (8 GB recommended) and 1 GB disk space"
+  },
+  {
+    "id": "ho_q3",
+    "category": "paraphrased",
+    "question": "Is there a limit on how many requests I can send per minute on the unpaid tier?",
+    "expected_answerable": true,
+    "expected_source": "api_reference.md",
+    "short_expected_answer": "15 requests per minute for Gemini free tier"
+  },
+  {
+    "id": "ho_q4",
+    "category": "paraphrased",
+    "question": "How often do external auditors review Docent's security posture?",
+    "expected_answerable": true,
+    "expected_source": "security_policy.pdf",
+    "short_expected_answer": "Bi-annually every June and December"
+  },
+  {
+    "id": "ho_q5",
+    "category": "multi_chunk",
+    "question": "Why was the 500-character chunk size selected instead of a larger or smaller window?",
+    "expected_answerable": true,
+    "expected_source": "chunking_and_embedding.md",
+    "short_expected_answer": "Balances precision and context for technical paragraphs (200-600 chars)"
+  },
+  {
+    "id": "ho_q6",
+    "category": "multi_chunk",
+    "question": "Why does the vector search use normalized unit vectors for cosine similarity?",
+    "expected_answerable": true,
+    "expected_source": "chunking_and_embedding.md",
+    "short_expected_answer": "Vectors are normalized to unit length so cosine similarity measures angle between direction vectors"
+  },
+  {
+    "id": "ho_q7",
+    "category": "multi_chunk",
+    "question": "What response structure is returned if a question cannot be answered from documentation?",
+    "expected_answerable": true,
+    "expected_source": "api_reference.md",
+    "short_expected_answer": "Insufficient context response with empty citations and grounded=false"
+  },
+  {
+    "id": "ho_q8",
+    "category": "cross_document",
+    "question": "Where does Docent persist vector embeddings during local deployment?",
+    "expected_answerable": true,
+    "expected_source": "deployment_guide.md",
+    "short_expected_answer": "CHROMA_PATH environment variable (default ./chroma_db or ./qdrant_storage)"
+  },
+  {
+    "id": "ho_q9",
+    "category": "paraphrased",
+    "question": "What is the procedure for installing dependencies and activating the virtual environment?",
+    "expected_answerable": true,
+    "expected_source": "sample.md",
+    "short_expected_answer": "python -m venv venv, source venv/bin/activate, pip install -r requirements.txt"
+  },
+  {
+    "id": "ho_q10",
+    "category": "paraphrased",
+    "question": "What is the turnaround time required to deliver a mitigation plan for critical security incidents?",
+    "expected_answerable": true,
+    "expected_source": "security_policy.pdf",
+    "short_expected_answer": "Full mitigation plan delivered within 2 hours"
+  },
+  {
+    "id": "ho_q11",
+    "category": "adversarial_near_domain",
+    "question": "How do I configure PostgreSQL connection pooling for Docent?",
+    "expected_answerable": false,
+    "short_expected_answer": "Unsupported (Docent uses vector DB storage, not PostgreSQL)"
+  },
+  {
+    "id": "ho_q12",
+    "category": "adversarial_near_domain",
+    "question": "What is the SLA turnaround time for low priority non-critical support tickets?",
+    "expected_answerable": false,
+    "short_expected_answer": "Unsupported (Security policy defines SLA only for critical incidents)"
+  },
+  {
+    "id": "ho_q13",
+    "category": "adversarial_near_domain",
+    "question": "How do I enable GPU acceleration for the sentence-transformer embedding model in Docent?",
+    "expected_answerable": false,
+    "short_expected_answer": "Unsupported (Embedding model is configured for CPU processing)"
+  },
+  {
+    "id": "ho_q14",
+    "category": "adversarial_near_domain",
+    "question": "What API key permissions are required for OpenAI GPT-4o integration in Docent?",
+    "expected_answerable": false,
+    "short_expected_answer": "Unsupported (Docent uses Google Gemini API)"
+  },
+  {
+    "id": "ho_q15",
+    "category": "adversarial_near_domain",
+    "question": "How do I configure multi-tenant role-based access control (RBAC) in Docent?",
+    "expected_answerable": false,
+    "short_expected_answer": "Unsupported (No multi-tenant RBAC functionality in Docent)"
+  },
+  {
+    "id": "ho_q16",
+    "category": "adversarial_out_of_domain",
+    "question": "What temperature should I bake sourdough bread in a home oven?",
+    "expected_answerable": false,
+    "short_expected_answer": "Unsupported (Out of domain query)"
+  }
+]
