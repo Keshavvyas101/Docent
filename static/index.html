@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docent — Documentation Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0f0f13;
+            color: #e4e4e7;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            padding: 2rem;
+            text-align: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-bottom: 1px solid #2a2a3e;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.3rem;
+        }
+
+        header p {
+            color: #9ca3af;
+            font-size: 0.9rem;
+        }
+
+        main {
+            width: 100%;
+            max-width: 720px;
+            padding: 2rem 1rem;
+            flex: 1;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        #question {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid #3f3f5e;
+            border-radius: 8px;
+            background: #1a1a2e;
+            color: #e4e4e7;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #question:focus { border-color: #a78bfa; }
+
+        #ask-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #7c3aed, #3b82f6);
+            color: white;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        #ask-btn:hover { opacity: 0.9; }
+        #ask-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        #loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+            color: #9ca3af;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid #3f3f5e;
+            border-top-color: #a78bfa;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #result { display: none; }
+
+        .answer-card {
+            background: #1a1a2e;
+            border: 1px solid #2a2a3e;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .grounded-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .grounded-true {
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .grounded-false {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .answer-text {
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .citations-header {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #9ca3af;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .citation {
+            background: #12121a;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .citation-source {
+            font-size: 0.8rem;
+            color: #a78bfa;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .citation-score {
+            font-size: 0.75rem;
+            color: #6b7280;
+            float: right;
+        }
+
+        .citation-text {
+            font-size: 0.85rem;
+            color: #9ca3af;
+            line-height: 1.4;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            color: #f87171;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Docent</h1>
+        <p>Ask questions about your documentation</p>
+    </header>
+
+    <main>
+        <div class="input-group">
+            <input type="text" id="question" placeholder="Ask a question..." autocomplete="off">
+            <button id="ask-btn" onclick="askQuestion()">Ask</button>
+        </div>
+
+        <div id="loading">
+            <span class="spinner"></span> Searching documents and generating answer...
+        </div>
+
+        <div id="result"></div>
+    </main>
+
+    <script>
+        const questionInput = document.getElementById('question');
+        const askBtn = document.getElementById('ask-btn');
+        const loading = document.getElementById('loading');
+        const resultDiv = document.getElementById('result');
+
+        questionInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') askQuestion();
+        });
+
+        async function askQuestion() {
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            askBtn.disabled = true;
+            loading.style.display = 'block';
+            resultDiv.style.display = 'none';
+
+            try {
+                const res = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question }),
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Request failed');
+                }
+
+                const data = await res.json();
+                renderResult(data);
+            } catch (err) {
+                resultDiv.innerHTML = `<div class="error">Error: ${err.message}</div>`;
+                resultDiv.style.display = 'block';
+            } finally {
+                askBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        function renderResult(data) {
+            const badgeClass = data.grounded ? 'grounded-true' : 'grounded-false';
+            const badgeText = data.grounded ? '● Grounded' : '○ Not Grounded';
+
+            let html = `
+                <div class="answer-card">
+                    <span class="grounded-badge ${badgeClass}">${badgeText}</span>
+                    <div class="answer-text">${escapeHtml(data.answer)}</div>
+                </div>
+            `;
+
+            if (data.citations && data.citations.length > 0) {
+                html += `<div class="citations-header">Sources (${data.citations.length})</div>`;
+                for (const c of data.citations) {
+                    html += `
+                        <div class="citation">
+                            <span class="citation-score">${(c.relevance_score * 100).toFixed(0)}% match</span>
+                            <div class="citation-source">${escapeHtml(c.source)} — ${escapeHtml(c.chunk_id)}</div>
+                            <div class="citation-text">${escapeHtml(c.text)}</div>
+                        </div>
+                    `;
+                }
+            }
+
+            resultDiv.innerHTML = html;
+            resultDiv.style.display = 'block';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
