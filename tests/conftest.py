@@ -99,12 +99,15 @@ def test_client(isolated_env):
 
 @pytest.fixture()
 def clean_data_dir(isolated_env):
-    """Wipe the isolated data directory before each test that requests it."""
+    """Wipe the isolated data directory and clear job history before each test."""
+    from app.jobs import job_manager
+    job_manager.clear()
     data_dir: Path = isolated_env["data_dir"]
     for f in data_dir.iterdir():
         if f.is_file():
             f.unlink()
     yield data_dir
+
 
 
 @pytest.fixture()

@@ -35,7 +35,7 @@ class DocumentInfo(BaseModel):
 
 
 class UploadResponse(BaseModel):
-    """Response returned by POST /documents."""
+    """Response returned by POST /documents (legacy/sync)."""
 
     filename: str = Field(..., description="Name of the uploaded file")
     status: str = Field(
@@ -48,6 +48,42 @@ class UploadResponse(BaseModel):
     message: str = Field(..., description="Human-readable result message")
 
 
+class UploadAsyncResponse(BaseModel):
+    """Response returned by POST /documents (HTTP 202 Accepted)."""
+
+    job_id: str = Field(..., description="Unique ingestion job identifier")
+    filename: str = Field(..., description="Name of the uploaded file being ingested")
+    status: str = Field(..., description="Initial job status, e.g. 'queued'")
+    message: str = Field(..., description="Human-readable result message")
+
+
+class JobStatusResponse(BaseModel):
+    """Status and progress details for an ingestion job."""
+
+    job_id: str = Field(..., description="Unique job identifier")
+    filename: str = Field(..., description="Source filename being ingested")
+    status: str = Field(
+        ..., description="'queued' | 'processing' | 'completed' | 'failed'"
+    )
+    progress: int = Field(0, description="Percentage complete (0 to 100)")
+    chunks_processed: int = Field(0, description="Number of chunks currently processed")
+    total_chunks: int = Field(0, description="Total estimated chunks to process")
+    created_at: str = Field(..., description="ISO 8601 creation timestamp")
+    completed_at: str | None = Field(None, description="ISO 8601 completion timestamp")
+    error: str | None = Field(None, description="Error message if status is 'failed'")
+    result_status: str | None = Field(
+        None, description="'ingested' | 'updated' | 'unchanged' when completed"
+    )
+
+
+class JobListResponse(BaseModel):
+    """List of recent ingestion jobs."""
+
+    jobs: list[JobStatusResponse] = Field(
+        default_factory=list, description="Recent ingestion jobs (most recent first)"
+    )
+
+
 class DeleteResponse(BaseModel):
     """Response returned by DELETE /documents/{name}."""
 
@@ -55,4 +91,3 @@ class DeleteResponse(BaseModel):
     chunks_deleted: int = Field(..., description="Number of Qdrant chunks removed")
     file_deleted: bool = Field(..., description="Whether the source file was removed from disk")
     message: str = Field(..., description="Human-readable result message")
-

@@ -3,19 +3,21 @@ Docent FastAPI application.
 
 Routes
 ------
-POST   /documents          Upload and ingest a document file.
-GET    /documents          List currently indexed documents.
-DELETE /documents/{name}   Delete a document from disk and Qdrant.
-POST   /ask                Ask a question about the ingested documentation.
-GET    /health             Health check.
-GET    /                   Redirects to the UI.
+POST   /documents              Upload and queue a document file for async ingestion.
+GET    /documents/jobs/{id}    Get status and progress of an ingestion job.
+GET    /documents/jobs         List recent ingestion jobs.
+GET    /documents              List currently indexed documents.
+DELETE /documents/{name}       Delete a document from disk and Qdrant.
+POST   /ask                    Ask a question about the ingested documentation.
+GET    /health                 Health check.
+GET    /                       Redirects to the UI.
 """
 
 import hashlib
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, HTTPException, UploadFile, status
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -29,23 +31,23 @@ from app.ingest import (
     get_qdrant_client,
     run_ingest,
 )
+from app.jobs import JobConflictError, job_manager
 from app.models import (
     AskRequest,
     AskResponse,
     DeleteResponse,
     DocumentInfo,
+    JobListResponse,
+    JobStatusResponse,
+    UploadAsyncResponse,
     UploadResponse,
 )
 from app.pipeline import ask
 
 app = FastAPI(
-    title="Docent",
-    description=(
-        "A lightweight grounded documentation knowledge assistant. "
-        "Uses RAG (Retrieval-Augmented Generation) to answer questions "
-        "based on ingested documents."
-    ),
-    version="0.2.0",
+    title="Docent API",
+    description="Grounded Documentation Knowledge Assistant with Async Ingestion",
+    version="1.0.0",
 )
 
 
@@ -56,13 +58,11 @@ def _validate_filename(name: str) -> None:
     """Raise HTTP 400 if *name* is unsafe (path traversal, absolute path, or contains separators)."""
     if not name:
         raise HTTPException(status_code=400, detail="Filename must not be empty.")
-    # Reject anything that looks like a path rather than a plain basename
     if name != os.path.basename(name):
         raise HTTPException(
             status_code=400,
             detail=f"Filename '{name}' must be a plain filename without directory components.",
         )
-    # Extra guard: reject explicit traversal sequences even if basename strips them
     if ".." in name or name.startswith("/") or name.startswith("\\"):
         raise HTTPException(
             status_code=400,
@@ -70,18 +70,20 @@ def _validate_filename(name: str) -> None:
         )
 
 
-# ── Document management routes ────────────────────────────────────────────────
+# ── Document management & Job routes ─────────────────────────────────────────
 
 
-@app.post("/documents", response_model=UploadResponse, summary="Upload and ingest a document")
-async def upload_document(file: UploadFile) -> UploadResponse:
-    """Accept a multipart file upload, save it to the data directory, and trigger ingestion.
+@app.post(
+    "/documents",
+    response_model=UploadAsyncResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Upload and queue a document for asynchronous ingestion",
+)
+async def upload_document(file: UploadFile) -> UploadAsyncResponse:
+    """Accept a multipart file upload, save it, and start background ingestion.
 
-    Supported file types: ``.md``, ``.txt``, ``.pdf``.
-
-    - If the file is **new**, it is embedded and indexed immediately.
-    - If the file **content is unchanged** (same SHA-256), ingestion is skipped (idempotent).
-    - If the file **content changed**, stale Qdrant chunks are deleted and the file is re-indexed.
+    Returns HTTP 202 Accepted immediately with a ``job_id``. Poll ``GET /documents/jobs/{job_id}``
+    to track processing progress.
     """
     filename: str = file.filename or ""
     _validate_filename(filename)
@@ -97,47 +99,65 @@ async def upload_document(file: UploadFile) -> UploadResponse:
             ),
         )
 
-    # Determine pre-upload status (new vs. known)
-    client = get_qdrant_client()
-    ensure_collection_exists(client)
-    pre_hashes = get_existing_doc_hashes(client, filename)
+    # Reject if an active ingestion job is running for this file
+    if job_manager.is_document_active(filename):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Document '{filename}' already has an active ingestion job running.",
+        )
+
+    # Acquire lock & create job entry
+    try:
+        job = job_manager.create_job(filename)
+    except JobConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
     # Save file to data directory
     import app.config as cfg
     data_dir = cfg.DATA_DIR
     dest: Path = data_dir / filename
     data_dir.mkdir(parents=True, exist_ok=True)
+
     content: bytes = await file.read()
     dest.write_bytes(content)
 
-    # Determine status by comparing the hash of received bytes against stored hashes
-    new_hash = hashlib.sha256(content).hexdigest()
+    # Start background ingestion job thread
+    job_manager.start_job(job.job_id, dest)
 
-    if new_hash in pre_hashes:
-        # File is identical — ingestion will skip it
-        chunks = count_source_chunks(client, filename)
-        return UploadResponse(
-            filename=filename,
-            status="unchanged",
-            chunks_indexed=chunks,
-            message=f"Document '{filename}' is unchanged. No re-indexing required.",
-        )
-
-    was_known = bool(pre_hashes)
-
-    # Run incremental ingestion (handles delete-old + embed-new internally)
-    run_ingest(data_dir)
-
-    chunks = count_source_chunks(client, filename)
-    status = "updated" if was_known else "ingested"
-    action = "re-indexed" if was_known else "indexed"
-
-    return UploadResponse(
+    return UploadAsyncResponse(
+        job_id=job.job_id,
         filename=filename,
-        status=status,
-        chunks_indexed=chunks,
-        message=f"Document '{filename}' {action} successfully ({chunks} chunk(s)).",
+        status="queued",
+        message=f"Document '{filename}' ingestion started.",
     )
+
+
+
+@app.get(
+    "/documents/jobs/{job_id}",
+    response_model=JobStatusResponse,
+    summary="Get ingestion job status and progress",
+)
+def get_job_status(job_id: str) -> JobStatusResponse:
+    """Return status, progress percentage, and chunk details for an ingestion job."""
+    job = job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Job '{job_id}' not found.",
+        )
+    return job.to_response()
+
+
+@app.get(
+    "/documents/jobs",
+    response_model=JobListResponse,
+    summary="List recent ingestion jobs",
+)
+def list_jobs() -> JobListResponse:
+    """Return recent ingestion jobs (most recent first)."""
+    jobs = job_manager.get_recent_jobs()
+    return JobListResponse(jobs=[j.to_response() for j in jobs])
 
 
 @app.get("/documents", response_model=list[DocumentInfo], summary="List indexed documents")
@@ -201,19 +221,23 @@ def delete_document(name: str) -> DeleteResponse:
     """Remove a document from the data directory and purge its Qdrant chunks.
 
     - Validates the filename to prevent path traversal attacks.
+    - Rejects with HTTP 409 if the document has an active ingestion job running.
     - Returns HTTP 404 if the file does not exist in the data directory.
     - **Never** deletes the entire Qdrant collection.
     """
-    # Check the name param for traversal sequences.
-    # Note: httpx normalises the URL path before sending, so '../' becomes the parent
-    # segment rather than a literal string in request.url.path. We therefore validate
-    # the name parameter directly, covering both URL-encoded and literal sequences.
     if "." in name.split("/")[0] and ".." in name:
         raise HTTPException(
             status_code=400,
             detail=f"Filename '{name}' contains illegal path components.",
         )
     _validate_filename(name)
+
+    # Reject deletion if an ingestion job for this document is active
+    if job_manager.is_document_active(name):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Document '{name}' has an active ingestion job running. Please wait for it to complete.",
+        )
 
     import app.config as cfg
     data_dir = cfg.DATA_DIR

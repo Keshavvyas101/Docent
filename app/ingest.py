@@ -231,8 +231,11 @@ def chunk_documents(docs: list[dict]) -> list[dict]:
     return chunks
 
 
-def embed_and_store(chunks: list[dict]) -> int:
+def embed_and_store(chunks: list[dict], progress_callback=None) -> int:
     """Embed chunks in batches and store in Qdrant safely.
+
+    If *progress_callback* is provided, calls ``progress_callback(processed, total)``
+    after each batch of embeddings.
 
     Returns total number of documents in collection after operation.
     """
@@ -241,17 +244,24 @@ def embed_and_store(chunks: list[dict]) -> int:
     ensure_collection_exists(client)
 
     if not chunks:
+        if progress_callback:
+            progress_callback(0, 0)
         return client.get_collection(coll).points_count
 
     model = SentenceTransformer(EMBEDDING_MODEL)
 
     # Memory-safe batch embedding
     texts = [c["text"] for c in chunks]
+    total_chunks = len(chunks)
     all_embeddings = []
-    for i in range(0, len(texts), INGEST_BATCH_SIZE):
-        batch = texts[i : i + INGEST_BATCH_SIZE]
+    batch_size = min(INGEST_BATCH_SIZE, 32)  # smaller batch size for responsive progress reporting
+
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i : i + batch_size]
         batch_embeddings = model.encode(batch, show_progress_bar=False).tolist()
         all_embeddings.extend(batch_embeddings)
+        if progress_callback:
+            progress_callback(len(all_embeddings), total_chunks)
 
     points = []
     for idx, c in enumerate(chunks):
@@ -270,12 +280,85 @@ def embed_and_store(chunks: list[dict]) -> int:
         )
 
     # Upsert in batches of 100
-    batch_size = 100
-    for start in range(0, len(points), batch_size):
-        end = min(start + batch_size, len(points))
+    upsert_batch_size = 100
+    for start in range(0, len(points), upsert_batch_size):
+        end = min(start + upsert_batch_size, len(points))
         client.upsert(collection_name=coll, points=points[start:end])
 
     return client.get_collection(coll).points_count
+
+
+def ingest_single_file(
+    filepath: Path,
+    progress_callback=None,
+) -> dict:
+    """Ingest a single document file with hash verification and progress callbacks.
+
+    Returns dict with 'status' ('ingested' | 'updated' | 'unchanged') and 'chunks_indexed'.
+    """
+    client = get_qdrant_client()
+    ensure_collection_exists(client)
+
+    if not filepath.exists() or not filepath.is_file():
+        raise FileNotFoundError(f"File '{filepath}' does not exist.")
+
+    ext = filepath.suffix.lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise ValueError(f"Unsupported file extension '{ext}'.")
+
+    doc_hash = compute_file_hash(filepath)
+    filename = filepath.name
+
+    if ext == ".pdf":
+        text = extract_pdf_text(filepath)
+    else:
+        text = filepath.read_text(encoding="utf-8")
+
+    if not text.strip():
+        raise ValueError(f"Document '{filename}' has no extractable text.")
+
+    existing_hashes = get_existing_doc_hashes(client, filename)
+
+    if doc_hash in existing_hashes:
+        # File is unchanged
+        chunks_count = count_source_chunks(client, filename)
+        if progress_callback:
+            progress_callback(chunks_count, chunks_count)
+        return {
+            "status": "unchanged",
+            "chunks_indexed": chunks_count,
+            "filename": filename,
+        }
+
+    was_known = bool(existing_hashes)
+    if was_known:
+        delete_source_chunks(client, filename)
+
+    doc = {
+        "text": text,
+        "source": filename,
+        "path": str(filepath),
+        "doc_hash": doc_hash,
+    }
+
+    chunks = chunk_documents([doc])
+    total_chunks = len(chunks)
+
+    if progress_callback:
+        progress_callback(0, total_chunks)
+
+    embed_and_store(chunks, progress_callback=progress_callback)
+
+    final_count = count_source_chunks(client, filename)
+    if progress_callback:
+        progress_callback(total_chunks, total_chunks)
+
+    return {
+        "status": "updated" if was_known else "ingested",
+        "chunks_indexed": final_count,
+        "filename": filename,
+    }
+
 
 
 def run_ingest(data_dir: Path | None = None) -> int:
