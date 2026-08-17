@@ -44,11 +44,26 @@ from app.models import (
 )
 from app.pipeline import ask
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(
     title="Docent API",
     description="Grounded Documentation Knowledge Assistant with Async Ingestion",
     version="1.0.0",
 )
+
+# Configure CORS for production deployment
+cors_origins_raw = os.getenv("CORS_ORIGINS", "*")
+cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins if cors_origins else ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
