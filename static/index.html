@@ -259,9 +259,8 @@
                 for (const c of data.citations) {
                     html += `
                         <div class="citation">
-                            <span class="citation-score">${(c.relevance_score * 100).toFixed(0)}% match</span>
                             <div class="citation-source">${escapeHtml(c.source)} — ${escapeHtml(c.chunk_id)}</div>
-                            <div class="citation-text">${escapeHtml(c.text)}</div>
+                            <div class="citation-text">${escapeHtml(c.quote || '')}</div>
                         </div>
                     `;
                 }

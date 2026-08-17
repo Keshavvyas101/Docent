@@ -15,9 +15,9 @@ def ask(question: str) -> dict:
     """Answer a question using the RAG pipeline.
 
     Returns:
-        Dict with 'answer', 'citations', 'grounded'.
+        Dict with 'answer', 'citations' (list[Citation]), 'grounded' (bool).
     """
-    # Layer 1: Retrieval-level grounding
+    # Layer 1: Retrieval-level grounding threshold
     chunks = retrieve(question)
 
     if not chunks:
@@ -27,22 +27,5 @@ def ask(question: str) -> dict:
             "grounded": False,
         }
 
-    # Layer 2: Gemini generation with prompt-level grounding
-    result = generate(question, chunks)
-
-    # Build citations from the chunks that were actually used
-    citations = [
-        {
-            "source": c["source"],
-            "chunk_id": c["chunk_id"],
-            "text": c["text"][:200] + ("..." if len(c["text"]) > 200 else ""),
-            "relevance_score": c["score"],
-        }
-        for c in chunks
-    ]
-
-    return {
-        "answer": result["answer"],
-        "citations": citations if result["grounded"] else [],
-        "grounded": result["grounded"],
-    }
+    # Layer 2: Gemini generation with prompt-level grounding & citation validation
+    return generate(question, chunks)

@@ -8,17 +8,17 @@ class AskRequest(BaseModel):
 
 
 class Citation(BaseModel):
-    source: str = Field(..., description="Source filename")
-    chunk_id: str = Field(..., description="Chunk identifier")
-    text: str = Field(..., description="Excerpt from the source chunk")
-    relevance_score: float = Field(..., description="Cosine similarity score")
+    source: str = Field(..., description="Source filename from authoritative metadata")
+    chunk_id: str = Field(..., description="Retrieved chunk identifier")
+    quote: str = Field(..., description="Direct quote or excerpt from the cited chunk")
 
 
 class AskResponse(BaseModel):
     answer: str = Field(..., description="The generated answer")
     citations: list[Citation] = Field(
-        default_factory=list, description="Source chunks used"
+        default_factory=list, description="Validated citations corresponding to retrieved chunks"
     )
     grounded: bool = Field(
         ..., description="Whether the answer is grounded in documents"
     )
+
