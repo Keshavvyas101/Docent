@@ -11,6 +11,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
+from app.generator import GeminiAPIError, GeminiAuthError, GeminiRateLimitError
 from app.models import AskRequest, AskResponse
 from app.pipeline import ask
 
@@ -50,7 +51,9 @@ def ask_endpoint(request: AskRequest):
     try:
         result = ask(request.question)
         return AskResponse(**result)
-    except RuntimeError as e:
+    except GeminiRateLimitError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except (GeminiAuthError, GeminiAPIError, RuntimeError) as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {e}")

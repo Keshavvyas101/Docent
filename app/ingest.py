@@ -1,10 +1,11 @@
+import hashlib
 import uuid
 from pathlib import Path
 
 import pypdf
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointStruct, VectorParams
 from sentence_transformers import SentenceTransformer
 
 from app.config import (
@@ -13,6 +14,7 @@ from app.config import (
     COLLECTION_NAME,
     DATA_DIR,
     EMBEDDING_MODEL,
+    INGEST_BATCH_SIZE,
     QDRANT_PATH,
     QDRANT_URL,
 )
@@ -28,6 +30,20 @@ def get_qdrant_client() -> QdrantClient:
     return QdrantClient(path=str(QDRANT_PATH))
 
 
+def ensure_collection_exists(client: QdrantClient) -> None:
+    """Ensure Qdrant collection exists without deleting existing data."""
+    if not client.collection_exists(COLLECTION_NAME):
+        client.create_collection(
+            collection_name=COLLECTION_NAME,
+            vectors_config=VectorParams(size=384, distance=Distance.COSINE),
+        )
+
+
+def compute_file_hash(filepath: Path) -> str:
+    """Compute SHA-256 hash of a file's raw bytes."""
+    return hashlib.sha256(filepath.read_bytes()).hexdigest()
+
+
 def extract_pdf_text(filepath: Path) -> str:
     """Extract plain text from a PDF file using pypdf."""
     reader = pypdf.PdfReader(str(filepath))
@@ -35,33 +51,96 @@ def extract_pdf_text(filepath: Path) -> str:
     return "\n\n".join(page_texts)
 
 
-def load_documents(data_dir: Path = DATA_DIR) -> list[dict]:
-    """Load all supported documents from the data directory.
+def get_existing_doc_hashes(client: QdrantClient, source: str) -> set[str]:
+    """Retrieve existing stored doc_hash values for a given source file."""
+    if not client.collection_exists(COLLECTION_NAME):
+        return set()
 
-    Returns a list of dicts with 'text', 'source' (filename), and 'path'.
+    filter_cond = Filter(
+        must=[
+            FieldCondition(
+                key="source",
+                match=MatchValue(value=source),
+            )
+        ]
+    )
+
+    scroll_res = client.scroll(
+        collection_name=COLLECTION_NAME,
+        scroll_filter=filter_cond,
+        limit=10,
+        with_payload=True,
+        with_vectors=False,
+    )[0]
+
+    hashes = set()
+    for point in scroll_res:
+        if point.payload and "doc_hash" in point.payload:
+            hashes.add(point.payload["doc_hash"])
+    return hashes
+
+
+def delete_source_chunks(client: QdrantClient, source: str) -> None:
+    """Delete all existing chunks for a specific source file."""
+    if not client.collection_exists(COLLECTION_NAME):
+        return
+
+    filter_cond = Filter(
+        must=[
+            FieldCondition(
+                key="source",
+                match=MatchValue(value=source),
+            )
+        ]
+    )
+    client.delete(
+        collection_name=COLLECTION_NAME,
+        points_selector=filter_cond,
+    )
+
+
+def load_documents(data_dir: Path = DATA_DIR) -> list[dict]:
+    """Load all supported documents from data directory with fault tolerance.
+
+    Skips corrupted, empty, or unreadable files with a warning.
+    Returns list of dicts: 'text', 'source', 'path', 'doc_hash'.
     """
     docs = []
+    if not data_dir.exists():
+        print(f"[WARNING] Data directory '{data_dir}' does not exist.")
+        return docs
+
     for filepath in sorted(data_dir.iterdir()):
         ext = filepath.suffix.lower()
         if ext in SUPPORTED_EXTENSIONS and filepath.is_file():
-            if ext == ".pdf":
-                text = extract_pdf_text(filepath)
-            else:
-                text = filepath.read_text(encoding="utf-8")
-            
-            if text.strip():
+            try:
+                doc_hash = compute_file_hash(filepath)
+                if ext == ".pdf":
+                    text = extract_pdf_text(filepath)
+                else:
+                    text = filepath.read_text(encoding="utf-8")
+
+                if not text.strip():
+                    print(f"[WARNING] Document '{filepath.name}' has no extractable text. Skipping.")
+                    continue
+
                 docs.append({
                     "text": text,
                     "source": filepath.name,
                     "path": str(filepath),
+                    "doc_hash": doc_hash,
                 })
+            except Exception as e:
+                print(f"[WARNING] Failed to load document '{filepath.name}': {e}. Skipping.")
+                continue
+
     return docs
 
 
 def chunk_documents(docs: list[dict]) -> list[dict]:
-    """Split documents into chunks, preserving source metadata.
+    """Split documents into chunks preserving metadata.
 
-    Returns a list of dicts with 'text', 'source', 'chunk_id'.
+    Returns list of dicts: 'text', 'source', 'chunk_id', 'doc_hash'.
     """
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
@@ -77,32 +156,31 @@ def chunk_documents(docs: list[dict]) -> list[dict]:
                 "text": text,
                 "source": doc["source"],
                 "chunk_id": chunk_id,
+                "doc_hash": doc["doc_hash"],
             })
     return chunks
 
 
 def embed_and_store(chunks: list[dict]) -> int:
-    """Embed chunks and store them in persistent Qdrant.
+    """Embed chunks in batches and store in Qdrant safely.
 
-    Returns the total number of documents in the collection after insertion.
+    Returns total number of documents in collection after operation.
     """
-    # Load embedding model (CPU)
+    client = get_qdrant_client()
+    ensure_collection_exists(client)
+
+    if not chunks:
+        return client.get_collection(COLLECTION_NAME).points_count
+
     model = SentenceTransformer(EMBEDDING_MODEL)
 
-    # Generate embeddings
+    # Memory-safe batch embedding
     texts = [c["text"] for c in chunks]
-    embeddings = model.encode(texts, show_progress_bar=True).tolist()
-
-    client = get_qdrant_client()
-
-    # Re-create collection
-    if client.collection_exists(COLLECTION_NAME):
-        client.delete_collection(COLLECTION_NAME)
-
-    client.create_collection(
-        collection_name=COLLECTION_NAME,
-        vectors_config=VectorParams(size=384, distance=Distance.COSINE),
-    )
+    all_embeddings = []
+    for i in range(0, len(texts), INGEST_BATCH_SIZE):
+        batch = texts[i : i + INGEST_BATCH_SIZE]
+        batch_embeddings = model.encode(batch, show_progress_bar=False).tolist()
+        all_embeddings.extend(batch_embeddings)
 
     points = []
     for idx, c in enumerate(chunks):
@@ -110,16 +188,17 @@ def embed_and_store(chunks: list[dict]) -> int:
         points.append(
             PointStruct(
                 id=point_id,
-                vector=embeddings[idx],
+                vector=all_embeddings[idx],
                 payload={
                     "chunk_id": c["chunk_id"],
                     "source": c["source"],
                     "text": c["text"],
+                    "doc_hash": c["doc_hash"],
                 },
             )
         )
 
-    # Insert in batches of 100
+    # Upsert in batches of 100
     batch_size = 100
     for start in range(0, len(points), batch_size):
         end = min(start + batch_size, len(points))
@@ -128,22 +207,45 @@ def embed_and_store(chunks: list[dict]) -> int:
     return client.get_collection(COLLECTION_NAME).points_count
 
 
-def run_ingest() -> int:
-    """Full ingestion pipeline: load → chunk → embed → store.
+def run_ingest(data_dir: Path = DATA_DIR) -> int:
+    """Full incremental ingestion pipeline: load → check hash → chunk → embed → store."""
+    client = get_qdrant_client()
+    ensure_collection_exists(client)
 
-    Returns the number of chunks stored.
-    """
-    print("Loading documents...")
-    docs = load_documents()
-    print(f"  Loaded {len(docs)} document(s)")
+    print("Scanning documents...")
+    docs = load_documents(data_dir)
+    print(f"  Found {len(docs)} valid document(s)")
 
-    print("Chunking...")
-    chunks = chunk_documents(docs)
+    docs_to_ingest = []
+    skipped_count = 0
+
+    for doc in docs:
+        source = doc["source"]
+        current_hash = doc["doc_hash"]
+        existing_hashes = get_existing_doc_hashes(client, source)
+
+        if current_hash in existing_hashes:
+            print(f"  [SKIP] Document '{source}' is unchanged (hash matches).")
+            skipped_count += 1
+        else:
+            if existing_hashes:
+                print(f"  [UPDATE] Document '{source}' content changed. Replacing existing chunks.")
+                delete_source_chunks(client, source)
+            else:
+                print(f"  [NEW] Document '{source}' is new. Ingesting.")
+            docs_to_ingest.append(doc)
+
+    if not docs_to_ingest:
+        print("All documents are up-to-date. Ingestion complete.")
+        return client.get_collection(COLLECTION_NAME).points_count
+
+    print(f"Chunking {len(docs_to_ingest)} document(s)...")
+    chunks = chunk_documents(docs_to_ingest)
     print(f"  Created {len(chunks)} chunk(s)")
 
-    print("Embedding and storing in Qdrant...")
+    print("Embedding and storing chunks in Qdrant...")
     count = embed_and_store(chunks)
-    print(f"  Qdrant collection '{COLLECTION_NAME}' now has {count} document(s)")
+    print(f"  Qdrant collection '{COLLECTION_NAME}' now has {count} total point(s)")
 
     return count
 

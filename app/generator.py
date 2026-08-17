@@ -35,10 +35,25 @@ Answer the question using ONLY the context above. If the context does not \
 support an answer, set grounded to false and answer to "INSUFFICIENT_CONTEXT"."""
 
 
+class GeminiAPIError(RuntimeError):
+    """Base exception for Gemini API errors."""
+    pass
+
+
+class GeminiRateLimitError(GeminiAPIError):
+    """Raised when Gemini API rate limit (429) is exceeded."""
+    pass
+
+
+class GeminiAuthError(GeminiAPIError):
+    """Raised when Gemini API authentication or key is invalid."""
+    pass
+
+
 def _configure_genai() -> None:
     """Configure the Gemini API client."""
     if not GEMINI_API_KEY:
-        raise RuntimeError(
+        raise GeminiAuthError(
             "GEMINI_API_KEY is not set. "
             "Copy .env.example to .env and add your key."
         )
@@ -121,8 +136,19 @@ def generate(question: str, context_chunks: list[dict]) -> dict:
             user_message,
             generation_config={"response_mime_type": "application/json"},
         )
+    except Exception as e:
+        err_msg = str(e)
+        if "429" in err_msg or "ResourceExhausted" in err_msg or "QuotaExceeded" in err_msg:
+            raise GeminiRateLimitError("Gemini API rate limit exceeded (HTTP 429). Please try again later.")
+        elif "API_KEY_INVALID" in err_msg or "InvalidArgument" in err_msg or "PERMISSION_DENIED" in err_msg or "Unauthenticated" in err_msg:
+            raise GeminiAuthError(f"Gemini API authentication error: {err_msg}")
+        else:
+            raise GeminiAPIError(f"Gemini API error: {err_msg}")
+
+    try:
         data = json.loads(response.text.strip())
-    except Exception:
+    except (json.JSONDecodeError, AttributeError, ValueError):
+        # Malformed response JSON gets handled as ungrounded
         data = {"answer": "INSUFFICIENT_CONTEXT", "grounded": False, "citations": []}
 
     answer_text = data.get("answer", "").strip()

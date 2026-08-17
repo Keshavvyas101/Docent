@@ -20,6 +20,7 @@ EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 # Chunking
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
+INGEST_BATCH_SIZE = 256
 
 # Vector DB
 COLLECTION_NAME = "docent_docs"
