@@ -8,6 +8,7 @@ and store in a persistent Chroma collection.
 from pathlib import Path
 
 import chromadb
+import pypdf
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 
@@ -21,7 +22,14 @@ from app.config import (
 )
 
 # Supported file extensions
-SUPPORTED_EXTENSIONS = {".md", ".txt"}
+SUPPORTED_EXTENSIONS = {".md", ".txt", ".pdf"}
+
+
+def extract_pdf_text(filepath: Path) -> str:
+    """Extract plain text from a PDF file using pypdf."""
+    reader = pypdf.PdfReader(str(filepath))
+    page_texts = [page.extract_text() for page in reader.pages if page.extract_text()]
+    return "\n\n".join(page_texts)
 
 
 def load_documents(data_dir: Path = DATA_DIR) -> list[dict]:
@@ -31,13 +39,19 @@ def load_documents(data_dir: Path = DATA_DIR) -> list[dict]:
     """
     docs = []
     for filepath in sorted(data_dir.iterdir()):
-        if filepath.suffix.lower() in SUPPORTED_EXTENSIONS and filepath.is_file():
-            text = filepath.read_text(encoding="utf-8")
-            docs.append({
-                "text": text,
-                "source": filepath.name,
-                "path": str(filepath),
-            })
+        ext = filepath.suffix.lower()
+        if ext in SUPPORTED_EXTENSIONS and filepath.is_file():
+            if ext == ".pdf":
+                text = extract_pdf_text(filepath)
+            else:
+                text = filepath.read_text(encoding="utf-8")
+            
+            if text.strip():
+                docs.append({
+                    "text": text,
+                    "source": filepath.name,
+                    "path": str(filepath),
+                })
     return docs
 
 
