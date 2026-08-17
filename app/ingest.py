@@ -11,30 +11,55 @@ from sentence_transformers import SentenceTransformer
 from app.config import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
-    COLLECTION_NAME,
-    DATA_DIR,
     EMBEDDING_MODEL,
     INGEST_BATCH_SIZE,
-    QDRANT_PATH,
-    QDRANT_URL,
 )
 
 # Supported file extensions
 SUPPORTED_EXTENSIONS = {".md", ".txt", ".pdf"}
 
+# Module-level singleton — matches pattern in retriever.py
+_client: QdrantClient | None = None
+
+
+def _coll() -> str:
+    """Return the current collection name from config (dynamic — respects test patches)."""
+    import app.config as cfg
+    return cfg.COLLECTION_NAME
+
 
 def get_qdrant_client() -> QdrantClient:
-    """Get Qdrant client connected to server URL or local path."""
-    if QDRANT_URL:
-        return QdrantClient(url=QDRANT_URL)
-    return QdrantClient(path=str(QDRANT_PATH))
+    """Return the shared Qdrant client, creating it on first call.
+
+    Uses ``QDRANT_URL`` from config if set (Docker / server mode), otherwise
+    falls back to local embedded storage at ``QDRANT_PATH``.\n
+    Call ``reset_qdrant_client()`` to force re-creation (e.g. in tests).
+    """
+    global _client
+    if _client is None:
+        import app.config as cfg
+        if cfg.QDRANT_URL:
+            _client = QdrantClient(url=cfg.QDRANT_URL)
+        else:
+            _client = QdrantClient(path=str(cfg.QDRANT_PATH))
+    return _client
+
+
+def reset_qdrant_client() -> None:
+    """Force the next call to ``get_qdrant_client()`` to create a new client.
+
+    Intended for use in tests that need to point at a different storage path.
+    """
+    global _client
+    _client = None
 
 
 def ensure_collection_exists(client: QdrantClient) -> None:
     """Ensure Qdrant collection exists without deleting existing data."""
-    if not client.collection_exists(COLLECTION_NAME):
+    coll = _coll()
+    if not client.collection_exists(coll):
         client.create_collection(
-            collection_name=COLLECTION_NAME,
+            collection_name=coll,
             vectors_config=VectorParams(size=384, distance=Distance.COSINE),
         )
 
@@ -53,7 +78,8 @@ def extract_pdf_text(filepath: Path) -> str:
 
 def get_existing_doc_hashes(client: QdrantClient, source: str) -> set[str]:
     """Retrieve existing stored doc_hash values for a given source file."""
-    if not client.collection_exists(COLLECTION_NAME):
+    coll = _coll()
+    if not client.collection_exists(coll):
         return set()
 
     filter_cond = Filter(
@@ -66,7 +92,7 @@ def get_existing_doc_hashes(client: QdrantClient, source: str) -> set[str]:
     )
 
     scroll_res = client.scroll(
-        collection_name=COLLECTION_NAME,
+        collection_name=coll,
         scroll_filter=filter_cond,
         limit=10,
         with_payload=True,
@@ -82,7 +108,8 @@ def get_existing_doc_hashes(client: QdrantClient, source: str) -> set[str]:
 
 def delete_source_chunks(client: QdrantClient, source: str) -> None:
     """Delete all existing chunks for a specific source file."""
-    if not client.collection_exists(COLLECTION_NAME):
+    coll = _coll()
+    if not client.collection_exists(coll):
         return
 
     filter_cond = Filter(
@@ -94,17 +121,60 @@ def delete_source_chunks(client: QdrantClient, source: str) -> None:
         ]
     )
     client.delete(
-        collection_name=COLLECTION_NAME,
+        collection_name=coll,
         points_selector=filter_cond,
     )
 
 
-def load_documents(data_dir: Path = DATA_DIR) -> list[dict]:
+def count_source_chunks(client: QdrantClient, source: str, collection: str | None = None) -> int:
+    """Return the number of indexed chunks that belong to *source* in *collection*.
+
+    Returns 0 if the collection does not exist or no chunks are found.
+    If *collection* is None, uses the current config collection name.
+    """
+    coll = collection if collection is not None else _coll()
+    if not client.collection_exists(coll):
+        return 0
+
+    filter_cond = Filter(
+        must=[
+            FieldCondition(
+                key="source",
+                match=MatchValue(value=source),
+            )
+        ]
+    )
+
+    total = 0
+    offset = None
+    while True:
+        batch, next_offset = client.scroll(
+            collection_name=coll,
+            scroll_filter=filter_cond,
+            limit=100,
+            offset=offset,
+            with_payload=False,
+            with_vectors=False,
+        )
+        total += len(batch)
+        if next_offset is None:
+            break
+        offset = next_offset
+
+    return total
+
+
+def load_documents(data_dir: Path | None = None) -> list[dict]:
     """Load all supported documents from data directory with fault tolerance.
 
     Skips corrupted, empty, or unreadable files with a warning.
     Returns list of dicts: 'text', 'source', 'path', 'doc_hash'.
+    If *data_dir* is None, uses the current config DATA_DIR.
     """
+    import app.config as cfg
+    if data_dir is None:
+        data_dir = cfg.DATA_DIR
+
     docs = []
     if not data_dir.exists():
         print(f"[WARNING] Data directory '{data_dir}' does not exist.")
@@ -166,11 +236,12 @@ def embed_and_store(chunks: list[dict]) -> int:
 
     Returns total number of documents in collection after operation.
     """
+    coll = _coll()
     client = get_qdrant_client()
     ensure_collection_exists(client)
 
     if not chunks:
-        return client.get_collection(COLLECTION_NAME).points_count
+        return client.get_collection(coll).points_count
 
     model = SentenceTransformer(EMBEDDING_MODEL)
 
@@ -202,13 +273,21 @@ def embed_and_store(chunks: list[dict]) -> int:
     batch_size = 100
     for start in range(0, len(points), batch_size):
         end = min(start + batch_size, len(points))
-        client.upsert(collection_name=COLLECTION_NAME, points=points[start:end])
+        client.upsert(collection_name=coll, points=points[start:end])
 
-    return client.get_collection(COLLECTION_NAME).points_count
+    return client.get_collection(coll).points_count
 
 
-def run_ingest(data_dir: Path = DATA_DIR) -> int:
-    """Full incremental ingestion pipeline: load → check hash → chunk → embed → store."""
+def run_ingest(data_dir: Path | None = None) -> int:
+    """Full incremental ingestion pipeline: load → check hash → chunk → embed → store.
+
+    If *data_dir* is None, uses the current config DATA_DIR.
+    """
+    import app.config as cfg
+    if data_dir is None:
+        data_dir = cfg.DATA_DIR
+
+    coll = _coll()
     client = get_qdrant_client()
     ensure_collection_exists(client)
 
@@ -237,7 +316,7 @@ def run_ingest(data_dir: Path = DATA_DIR) -> int:
 
     if not docs_to_ingest:
         print("All documents are up-to-date. Ingestion complete.")
-        return client.get_collection(COLLECTION_NAME).points_count
+        return client.get_collection(coll).points_count
 
     print(f"Chunking {len(docs_to_ingest)} document(s)...")
     chunks = chunk_documents(docs_to_ingest)
@@ -245,11 +324,10 @@ def run_ingest(data_dir: Path = DATA_DIR) -> int:
 
     print("Embedding and storing chunks in Qdrant...")
     count = embed_and_store(chunks)
-    print(f"  Qdrant collection '{COLLECTION_NAME}' now has {count} total point(s)")
+    print(f"  Qdrant collection '{coll}' now has {count} total point(s)")
 
     return count
 
 
 if __name__ == "__main__":
     run_ingest()
-

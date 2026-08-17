@@ -8,3 +8,6 @@ qdrant-client
 pydantic
 python-dotenv
 pypdf
+python-multipart
+httpx
+pytest

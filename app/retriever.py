@@ -7,14 +7,7 @@ Query the Qdrant collection for chunks similar to a user question.
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 
-from app.config import (
-    COLLECTION_NAME,
-    EMBEDDING_MODEL,
-    QDRANT_PATH,
-    QDRANT_URL,
-    SIMILARITY_THRESHOLD,
-    TOP_K,
-)
+from app.config import EMBEDDING_MODEL
 
 # Module-level singletons (loaded once, reused)
 _model: SentenceTransformer | None = None
@@ -31,36 +24,47 @@ def _get_model() -> SentenceTransformer:
 def _get_client() -> QdrantClient:
     global _client
     if _client is None:
-        if QDRANT_URL:
-            _client = QdrantClient(url=QDRANT_URL)
+        import app.config as cfg
+        if cfg.QDRANT_URL:
+            _client = QdrantClient(url=cfg.QDRANT_URL)
         else:
-            _client = QdrantClient(path=str(QDRANT_PATH))
+            _client = QdrantClient(path=str(cfg.QDRANT_PATH))
     return _client
 
 
-def retrieve(question: str, top_k: int = TOP_K) -> list[dict]:
+def retrieve(question: str, top_k: int | None = None) -> list[dict]:
     """Retrieve the most relevant chunks for a question from Qdrant.
 
     Returns a list of dicts with 'chunk_id', 'source', 'text', 'score'.
     Score is cosine similarity (higher = more relevant).
     Chunks below SIMILARITY_THRESHOLD are excluded.
     """
+    import app.config as cfg
+
+    effective_top_k = top_k if top_k is not None else cfg.TOP_K
+    threshold = cfg.SIMILARITY_THRESHOLD
+    collection = cfg.COLLECTION_NAME
+
     model = _get_model()
     client = _get_client()
 
     query_vector = model.encode([question])[0].tolist()
 
-    # Query Qdrant
-    results = client.query_points(
-        collection_name=COLLECTION_NAME,
-        query=query_vector,
-        limit=top_k,
-    )
+    # Query Qdrant — handle gracefully if collection doesn't exist yet
+    try:
+        results = client.query_points(
+            collection_name=collection,
+            query=query_vector,
+            limit=effective_top_k,
+        )
+    except (ValueError, KeyError):
+        # Collection not found (e.g., fresh DB in tests) — no chunks available
+        return []
 
     chunks = []
     for point in results.points:
         similarity = float(point.score)
-        if similarity < SIMILARITY_THRESHOLD:
+        if similarity < threshold:
             continue
 
         payload = point.payload or {}
