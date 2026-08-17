@@ -1,0 +1,148 @@
+[
+  {
+    "id": "q1",
+    "question": "What is the default chunk size used by Docent?",
+    "expected_answerable": true,
+    "expected_source": "chunking_and_embedding.md",
+    "short_expected_answer": "500 characters"
+  },
+  {
+    "id": "q2",
+    "question": "What is the chunk overlap setting in characters?",
+    "expected_answerable": true,
+    "expected_source": "chunking_and_embedding.md",
+    "short_expected_answer": "50 characters"
+  },
+  {
+    "id": "q3",
+    "question": "What vector dimension does the all-MiniLM-L6-v2 embedding model output?",
+    "expected_answerable": true,
+    "expected_source": "chunking_and_embedding.md",
+    "short_expected_answer": "384-dimensional dense vector"
+  },
+  {
+    "id": "q4",
+    "question": "How is mean pooling used in the embedding process?",
+    "expected_answerable": true,
+    "expected_source": "chunking_and_embedding.md",
+    "short_expected_answer": "The output hidden states are mean-pooled to produce a single 384-dimensional vector."
+  },
+  {
+    "id": "q5",
+    "question": "What are the minimum RAM requirements for running Docent locally?",
+    "expected_answerable": true,
+    "expected_source": "deployment_guide.md",
+    "short_expected_answer": "4 GB RAM minimum (8 GB recommended)"
+  },
+  {
+    "id": "q6",
+    "question": "How do I build and run Docent using Docker?",
+    "expected_answerable": true,
+    "expected_source": "deployment_guide.md",
+    "short_expected_answer": "docker build -t docent . and docker run -p 8000:8000 --env-file .env docent"
+  },
+  {
+    "id": "q7",
+    "question": "What environment variable configures the ChromaDB persistence path?",
+    "expected_answerable": true,
+    "expected_source": "deployment_guide.md",
+    "short_expected_answer": "CHROMA_PATH"
+  },
+  {
+    "id": "q8",
+    "question": "Why is the first query in Docent sometimes slow?",
+    "expected_answerable": true,
+    "expected_source": "deployment_guide.md",
+    "short_expected_answer": "The embedding model is loaded on the first request."
+  },
+  {
+    "id": "q9",
+    "question": "What rate limits apply to the Gemini API free tier in Docent?",
+    "expected_answerable": true,
+    "expected_source": "api_reference.md",
+    "short_expected_answer": "15 requests per minute"
+  },
+  {
+    "id": "q10",
+    "question": "What HTTP status code is returned for an invalid request body in the API?",
+    "expected_answerable": true,
+    "expected_source": "api_reference.md",
+    "short_expected_answer": "422"
+  },
+  {
+    "id": "q11",
+    "question": "What is the request body field for the POST /ask endpoint?",
+    "expected_answerable": true,
+    "expected_source": "api_reference.md",
+    "short_expected_answer": "question (string)"
+  },
+  {
+    "id": "q12",
+    "question": "What fields are returned in a successful response from POST /ask?",
+    "expected_answerable": true,
+    "expected_source": "api_reference.md",
+    "short_expected_answer": "answer, citations, grounded"
+  },
+  {
+    "id": "q13",
+    "question": "What encryption standard is enforced for stored vector embeddings in ChromaDB?",
+    "expected_answerable": true,
+    "expected_source": "security_policy.pdf",
+    "short_expected_answer": "AES-256 encryption at rest"
+  },
+  {
+    "id": "q14",
+    "question": "How frequently are security audits conducted for Docent instances?",
+    "expected_answerable": true,
+    "expected_source": "security_policy.pdf",
+    "short_expected_answer": "Bi-annually every June and December"
+  },
+  {
+    "id": "q15",
+    "question": "What is the response SLA for critical security incidents?",
+    "expected_answerable": true,
+    "expected_source": "security_policy.pdf",
+    "short_expected_answer": "Acknowledged within 15 minutes, full mitigation plan within 2 hours"
+  },
+  {
+    "id": "q16",
+    "question": "What Python versions are supported by Docent?",
+    "expected_answerable": true,
+    "expected_source": "sample.md",
+    "short_expected_answer": "Python 3.10 or later"
+  },
+  {
+    "id": "q17",
+    "question": "How does Docent handle document ingestion and vector storage?",
+    "expected_answerable": true,
+    "expected_source": "sample.md",
+    "short_expected_answer": "Markdown files are split into overlapping chunks and stored in ChromaDB."
+  },
+  {
+    "id": "q18",
+    "question": "What file format does Docent require for setting up API keys?",
+    "expected_answerable": true,
+    "expected_source": "sample.md",
+    "short_expected_answer": ".env file containing GEMINI_API_KEY"
+  },
+  {
+    "id": "q19",
+    "question": "How do I configure OAuth2 authentication for Docent?",
+    "expected_answerable": false
+  },
+  {
+    "id": "q20",
+    "question": "What is the recipe for making standard French onion soup?",
+    "expected_answerable": false
+  },
+  {
+    "id": "q21",
+    "question": "How do I set up a Qdrant cluster for multi-node vector replication?",
+    "expected_answerable": false
+  },
+  {
+    "id": "q22",
+    "question": "What is the stock price of Google today?",
+    "expected_answerable": false
+  }
+]

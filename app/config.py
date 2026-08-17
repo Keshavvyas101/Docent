@@ -29,4 +29,4 @@ SIMILARITY_THRESHOLD = 0.3  # Minimum cosine similarity to consider relevant
 
 # Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = "gemini-3.6-flash"
+GEMINI_MODEL = "gemini-3.5-flash-lite"
