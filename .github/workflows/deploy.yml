@@ -1,0 +1,35 @@
+name: CD - Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches: [ main ]
+
+jobs:
+  deploy:
+    name: Deploy Docent Application
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Trigger Production Deployment / Webhook
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$DEPLOY_HOOK_URL" ]; then
+            echo "Triggering production deployment webhook..."
+            curl -s -X POST "$DEPLOY_HOOK_URL"
+          else
+            echo "DEPLOY_HOOK_URL secret not set. Skipping automated webhook trigger."
+            echo "Production deployment configured via Docker Compose / Container Host."
+          fi

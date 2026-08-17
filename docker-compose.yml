@@ -9,6 +9,11 @@ services:
       - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage:z
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/readyz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: always
 
   docent-api:
@@ -18,14 +23,19 @@ services:
     container_name: docent-api
     ports:
       - "8000:8000"
+    volumes:
+      - docent_data:/app/data
     environment:
       - QDRANT_URL=http://qdrant:6333
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
     env_file:
       - .env
     depends_on:
-      - qdrant
+      qdrant:
+        condition: service_healthy
     restart: always
 
 volumes:
   qdrant_data:
+  docent_data:
