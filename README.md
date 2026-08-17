@@ -29,7 +29,7 @@ Deterministic Citation Validation against Qdrant metadata
     ↓
 Grounded Answer + Structured Citations
     ↓
-FastAPI POST /ask & Static UI
+FastAPI (POST /ask, GET /documents, POST /documents, DELETE /documents/{name}) & Interactive Dark UI
 ```
 
 ## Two-Layer Grounding Guardrail
@@ -126,6 +126,14 @@ curl -X POST http://localhost:8000/ask \
 **Via Swagger UI:**
 
 Open http://localhost:8000/docs in your browser.
+
+### Document Management APIs & Interactive UI
+
+Docent features a dark-themed interactive web UI at `http://localhost:8000/` that integrates document management and RAG question answering:
+
+- **`GET /documents`** — List all currently indexed documents with chunk counts and SHA-256 hashes.
+- **`POST /documents`** — Upload `.pdf`, `.md`, or `.txt` files. Computes SHA-256 hash, incrementally ingests new files, updates changed files, and skips unchanged files (idempotent).
+- **`DELETE /documents/{name}`** — Remove source file from disk and purge its associated chunks from Qdrant without affecting other documents.
 
 ### Example Response
 

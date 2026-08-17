@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Docent — Documentation Assistant</title>
+    <meta name="description" content="Ask questions about your documentation. Upload PDFs, Markdown, and text files and get grounded, cited answers powered by Gemini.">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* ── Reset & base ──────────────────────────────────────────────────── */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -14,42 +16,378 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
         }
 
+        /* ── Header ────────────────────────────────────────────────────────── */
         header {
             width: 100%;
-            padding: 2rem;
-            text-align: center;
+            padding: 1.5rem 2rem;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             border-bottom: 1px solid #2a2a3e;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
 
         header h1 {
-            font-size: 1.8rem;
+            font-size: 1.6rem;
             font-weight: 700;
             background: linear-gradient(135deg, #a78bfa, #60a5fa);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 0.3rem;
+            background-clip: text;
+            flex-shrink: 0;
         }
 
         header p {
-            color: #9ca3af;
+            color: #6b7280;
             font-size: 0.9rem;
         }
 
-        main {
-            width: 100%;
-            max-width: 720px;
-            padding: 2rem 1rem;
+        /* ── App layout ────────────────────────────────────────────────────── */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 0;
             flex: 1;
+            min-height: 0;
+        }
+
+        /* ── Sidebar (Documents) ───────────────────────────────────────────── */
+        .sidebar {
+            border-right: 1px solid #2a2a3e;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 1.25rem 1.25rem 1rem;
+            border-bottom: 1px solid #2a2a3e;
+            background: #12121a;
+        }
+
+        .sidebar-header h2 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #9ca3af;
+        }
+
+        /* ── Upload area ───────────────────────────────────────────────────── */
+        .upload-zone {
+            padding: 1.25rem;
+            border-bottom: 1px solid #2a2a3e;
+            background: #12121a;
+        }
+
+        .drop-area {
+            border: 2px dashed #3f3f5e;
+            border-radius: 10px;
+            padding: 1.25rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            position: relative;
+            margin-bottom: 0.75rem;
+        }
+
+        .drop-area:hover, .drop-area.drag-over {
+            border-color: #a78bfa;
+            background: rgba(167, 139, 250, 0.05);
+        }
+
+        .drop-area input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .drop-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.4rem;
+            display: block;
+        }
+
+        .drop-label {
+            font-size: 0.8rem;
+            color: #9ca3af;
+            line-height: 1.4;
+        }
+
+        .drop-types {
+            font-size: 0.7rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+
+        #upload-btn {
+            width: 100%;
+            padding: 0.6rem 1rem;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #7c3aed, #3b82f6);
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+
+        #upload-btn:hover { opacity: 0.9; }
+        #upload-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* ── Upload feedback ────────────────────────────────────────────────── */
+        #upload-status {
+            margin-top: 0.65rem;
+            font-size: 0.78rem;
+            border-radius: 6px;
+            display: none;
+            padding: 0.55rem 0.75rem;
+            line-height: 1.4;
+        }
+
+        #upload-status.success {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.25);
+            color: #4ade80;
+        }
+
+        #upload-status.warning {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.25);
+            color: #fbbf24;
+        }
+
+        #upload-status.error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: #f87171;
+        }
+
+        /* ── Document list ─────────────────────────────────────────────────── */
+        .doc-list-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.75rem 0;
+        }
+
+        .doc-list-loading {
+            padding: 1.5rem;
+            text-align: center;
+            color: #6b7280;
+            font-size: 0.82rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .doc-empty {
+            padding: 2rem 1.25rem;
+            text-align: center;
+            color: #6b7280;
+        }
+
+        .doc-empty-icon {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+            opacity: 0.5;
+        }
+
+        .doc-empty h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #9ca3af;
+            margin-bottom: 0.4rem;
+        }
+
+        .doc-empty p {
+            font-size: 0.78rem;
+            line-height: 1.5;
+        }
+
+        .doc-list-error {
+            padding: 1rem 1.25rem;
+            font-size: 0.78rem;
+            color: #f87171;
+            background: rgba(239, 68, 68, 0.07);
+            margin: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .doc-item {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.65rem 1.25rem;
+            border-bottom: 1px solid #1e1e2e;
+            transition: background 0.15s;
+        }
+
+        .doc-item:hover { background: #1a1a28; }
+
+        .doc-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+            width: 1.2rem;
+            text-align: center;
+        }
+
+        .doc-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .doc-name {
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: #e4e4e7;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .doc-meta {
+            font-size: 0.7rem;
+            color: #6b7280;
+            margin-top: 0.1rem;
+        }
+
+        .doc-delete-btn {
+            flex-shrink: 0;
+            width: 26px;
+            height: 26px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(239, 68, 68, 0.08);
+            color: #f87171;
+            cursor: pointer;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s, color 0.15s;
+            opacity: 0.6;
+        }
+
+        .doc-delete-btn:hover { background: rgba(239, 68, 68, 0.2); opacity: 1; }
+        .doc-delete-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+        /* ── Confirmation dialog ────────────────────────────────────────────── */
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(2px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .overlay.open { display: flex; }
+
+        .dialog {
+            background: #1a1a2e;
+            border: 1px solid #2a2a3e;
+            border-radius: 12px;
+            padding: 1.5rem;
+            max-width: 360px;
+            width: calc(100% - 2rem);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .dialog h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .dialog p {
+            font-size: 0.85rem;
+            color: #9ca3af;
+            margin-bottom: 1.25rem;
+            line-height: 1.5;
+        }
+
+        .dialog-filename {
+            color: #a78bfa;
+            font-weight: 500;
+        }
+
+        .dialog-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
+
+        .btn-cancel {
+            padding: 0.5rem 1rem;
+            border: 1px solid #3f3f5e;
+            border-radius: 7px;
+            background: transparent;
+            color: #9ca3af;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .btn-cancel:hover { background: #2a2a3e; }
+
+        .btn-confirm-delete {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 7px;
+            background: #ef4444;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .btn-confirm-delete:hover { opacity: 0.85; }
+        .btn-confirm-delete:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* ── Main ask panel ─────────────────────────────────────────────────── */
+        .ask-panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .ask-panel-inner {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.75rem 1.75rem 1rem;
+        }
+
+        .panel-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #9ca3af;
+            margin-bottom: 1rem;
         }
 
         .input-group {
             display: flex;
             gap: 0.5rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
         }
 
         #question {
@@ -62,6 +400,7 @@
             font-size: 0.95rem;
             outline: none;
             transition: border-color 0.2s;
+            font-family: inherit;
         }
 
         #question:focus { border-color: #a78bfa; }
@@ -76,205 +415,672 @@
             font-weight: 600;
             cursor: pointer;
             transition: opacity 0.2s;
+            white-space: nowrap;
         }
 
         #ask-btn:hover { opacity: 0.9; }
         #ask-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        #loading {
-            display: none;
-            text-align: center;
-            padding: 2rem;
-            color: #9ca3af;
-        }
-
+        /* ── Loading spinner ────────────────────────────────────────────────── */
         .spinner {
             display: inline-block;
-            width: 24px;
-            height: 24px;
-            border: 3px solid #3f3f5e;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #3f3f5e;
             border-top-color: #a78bfa;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
-            margin-right: 0.5rem;
             vertical-align: middle;
+            flex-shrink: 0;
+        }
+
+        .spinner-lg {
+            width: 22px;
+            height: 22px;
+            border-width: 3px;
+            margin-right: 0.5rem;
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        #ask-loading {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 0;
+            color: #9ca3af;
+            font-size: 0.9rem;
+        }
+
+        /* ── Answer area ────────────────────────────────────────────────────── */
         #result { display: none; }
 
         .answer-card {
             background: #1a1a2e;
             border: 1px solid #2a2a3e;
             border-radius: 12px;
-            padding: 1.5rem;
+            padding: 1.25rem 1.5rem;
             margin-bottom: 1rem;
         }
 
         .grounded-badge {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
             padding: 0.2rem 0.6rem;
             border-radius: 999px;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             font-weight: 600;
             margin-bottom: 0.75rem;
         }
 
         .grounded-true {
-            background: rgba(34, 197, 94, 0.15);
+            background: rgba(34, 197, 94, 0.12);
             color: #4ade80;
             border: 1px solid rgba(34, 197, 94, 0.3);
         }
 
         .grounded-false {
-            background: rgba(239, 68, 68, 0.15);
+            background: rgba(239, 68, 68, 0.12);
             color: #f87171;
             border: 1px solid rgba(239, 68, 68, 0.3);
         }
 
         .answer-text {
-            line-height: 1.6;
+            line-height: 1.65;
             white-space: pre-wrap;
+            font-size: 0.95rem;
         }
 
         .citations-header {
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             font-weight: 600;
             color: #9ca3af;
             margin-bottom: 0.5rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
         }
 
         .citation {
             background: #12121a;
             border: 1px solid #2a2a3e;
             border-radius: 8px;
-            padding: 0.75rem 1rem;
-            margin-bottom: 0.5rem;
+            padding: 0.7rem 1rem;
+            margin-bottom: 0.45rem;
         }
 
         .citation-source {
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             color: #a78bfa;
             font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
-
-        .citation-score {
-            font-size: 0.75rem;
-            color: #6b7280;
-            float: right;
+            margin-bottom: 0.2rem;
         }
 
         .citation-text {
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             color: #9ca3af;
-            line-height: 1.4;
+            line-height: 1.45;
         }
 
-        .error {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
+        .ask-error {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.25);
             border-radius: 8px;
-            padding: 1rem;
+            padding: 0.85rem 1rem;
             color: #f87171;
+            font-size: 0.88rem;
+        }
+
+        /* ── Scrollbar ──────────────────────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3f3f5e; border-radius: 99px; }
+
+        /* ── Responsive ─────────────────────────────────────────────────────── */
+        @media (max-width: 700px) {
+            .app-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr;
+            }
+            .sidebar {
+                border-right: none;
+                border-bottom: 1px solid #2a2a3e;
+                max-height: 55vh;
+            }
+            .ask-panel-inner { padding: 1.25rem 1rem; }
         }
     </style>
 </head>
 <body>
-    <header>
-        <h1>Docent</h1>
-        <p>Ask questions about your documentation</p>
-    </header>
 
-    <main>
-        <div class="input-group">
-            <input type="text" id="question" placeholder="Ask a question..." autocomplete="off">
-            <button id="ask-btn" onclick="askQuestion()">Ask</button>
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<header>
+    <h1>Docent</h1>
+    <p>Ask questions about your documentation</p>
+</header>
+
+<!-- ── Delete confirmation dialog ─────────────────────────────────────────── -->
+<div class="overlay" id="delete-overlay" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+    <div class="dialog">
+        <h3 id="dialog-title">Delete document?</h3>
+        <p>This will permanently remove <span class="dialog-filename" id="dialog-filename"></span> and its indexed chunks from the search index. This cannot be undone.</p>
+        <div class="dialog-actions">
+            <button class="btn-cancel" id="dialog-cancel-btn">Cancel</button>
+            <button class="btn-confirm-delete" id="dialog-confirm-btn">
+                <span id="dialog-confirm-text">Delete</span>
+                <span class="spinner" id="dialog-spinner" style="display:none;"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Main layout ─────────────────────────────────────────────────────────── -->
+<div class="app-layout">
+
+    <!-- Sidebar: Documents -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>Documents</h2>
         </div>
 
-        <div id="loading">
-            <span class="spinner"></span> Searching documents and generating answer...
+        <!-- Upload zone -->
+        <div class="upload-zone">
+            <div class="drop-area" id="drop-area" role="button" aria-label="Click or drag a file to upload">
+                <input type="file"
+                       id="file-input"
+                       accept=".pdf,.md,.txt"
+                       aria-label="Choose file to upload">
+                <span class="drop-icon" aria-hidden="true">📂</span>
+                <div class="drop-label">Click to choose or drag a file here</div>
+                <div class="drop-types">.pdf &nbsp;·&nbsp; .md &nbsp;·&nbsp; .txt</div>
+            </div>
+
+            <div id="selected-file-label" style="font-size:0.75rem;color:#9ca3af;margin-bottom:0.5rem;display:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+
+            <button id="upload-btn" disabled aria-label="Upload selected file">
+                <span id="upload-btn-text">Upload</span>
+                <span class="spinner" id="upload-spinner" style="display:none;"></span>
+            </button>
+
+            <div id="upload-status" role="status" aria-live="polite"></div>
         </div>
 
-        <div id="result"></div>
-    </main>
+        <!-- Document list -->
+        <div class="doc-list-section" id="doc-list-section" aria-label="Indexed documents" aria-live="polite">
+            <div class="doc-list-loading" id="doc-list-loading">
+                <span class="spinner spinner-lg"></span>
+                Loading documents…
+            </div>
+        </div>
+    </aside>
 
-    <script>
-        const questionInput = document.getElementById('question');
-        const askBtn = document.getElementById('ask-btn');
-        const loading = document.getElementById('loading');
-        const resultDiv = document.getElementById('result');
+    <!-- Ask panel -->
+    <section class="ask-panel" aria-label="Ask a question">
+        <div class="ask-panel-inner">
+            <div class="panel-label">Ask a question</div>
 
-        questionInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') askQuestion();
+            <div class="input-group">
+                <input
+                    type="text"
+                    id="question"
+                    placeholder="Ask anything about your documents…"
+                    autocomplete="off"
+                    aria-label="Question"
+                >
+                <button id="ask-btn" aria-label="Submit question">Ask</button>
+            </div>
+
+            <div id="ask-loading" role="status" aria-live="polite">
+                <span class="spinner spinner-lg"></span>
+                Searching and generating answer…
+            </div>
+
+            <div id="result" aria-live="polite"></div>
+        </div>
+    </section>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   Docent — Phase 9 Interactive UI
+   All DOM manipulation uses safe textContent / createElement — no unsanitised
+   innerHTML is used for server-provided strings. The only innerHTML usages
+   build purely static markup strings with no interpolated server data.
+═══════════════════════════════════════════════════════════════════════════ */
+
+// ── Element refs ─────────────────────────────────────────────────────────────
+const fileInput         = document.getElementById('file-input');
+const dropArea          = document.getElementById('drop-area');
+const selectedFileLabel = document.getElementById('selected-file-label');
+const uploadBtn         = document.getElementById('upload-btn');
+const uploadBtnText     = document.getElementById('upload-btn-text');
+const uploadSpinner     = document.getElementById('upload-spinner');
+const uploadStatus      = document.getElementById('upload-status');
+const docListSection    = document.getElementById('doc-list-section');
+const docListLoading    = document.getElementById('doc-list-loading');
+
+const deleteOverlay     = document.getElementById('delete-overlay');
+const dialogFilename    = document.getElementById('dialog-filename');
+const dialogCancelBtn   = document.getElementById('dialog-cancel-btn');
+const dialogConfirmBtn  = document.getElementById('dialog-confirm-btn');
+const dialogConfirmText = document.getElementById('dialog-confirm-text');
+const dialogSpinner     = document.getElementById('dialog-spinner');
+
+const questionInput     = document.getElementById('question');
+const askBtn            = document.getElementById('ask-btn');
+const askLoading        = document.getElementById('ask-loading');
+const resultDiv         = document.getElementById('result');
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let pendingDeleteName = null;   // filename pending confirmation
+let uploadInProgress  = false;
+let deleteInProgress  = false;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Return a text node — never trust server strings to be HTML-safe. */
+function text(str) { return document.createTextNode(String(str ?? '')); }
+
+/** Create element with optional className and children. */
+function el(tag, cls, ...children) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    children.forEach(c => e.appendChild(typeof c === 'string' ? text(c) : c));
+    return e;
+}
+
+/** File-type emoji icon. */
+function fileIcon(name) {
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    return ext === 'pdf' ? '📄' : ext === 'md' ? '📝' : '📃';
+}
+
+/** Friendly ingestion status label + colour class. */
+function statusLabel(status) {
+    if (status === 'ingested')  return { label: 'Indexed',   cls: 'success' };
+    if (status === 'updated')   return { label: 'Updated',   cls: 'success' };
+    if (status === 'unchanged') return { label: 'Unchanged', cls: 'warning' };
+    return { label: status, cls: 'success' };
+}
+
+/** Show the upload feedback strip. */
+function showUploadStatus(message, type) {
+    uploadStatus.className = type;
+    uploadStatus.style.display = 'block';
+    uploadStatus.textContent = '';
+    uploadStatus.appendChild(text(message));
+}
+
+/** Hide the upload feedback strip. */
+function clearUploadStatus() {
+    uploadStatus.style.display = 'none';
+    uploadStatus.className = '';
+}
+
+/** Human-readable error from a fetch Response. */
+async function friendlyError(res) {
+    try {
+        const body = await res.json();
+        return body.detail || `Server error (HTTP ${res.status})`;
+    } catch {
+        return `Server error (HTTP ${res.status})`;
+    }
+}
+
+// ── File picker ───────────────────────────────────────────────────────────────
+
+fileInput.addEventListener('change', () => {
+    const f = fileInput.files[0];
+    if (!f) return;
+    selectedFileLabel.textContent = f.name;
+    selectedFileLabel.style.display = 'block';
+    uploadBtn.disabled = false;
+    clearUploadStatus();
+});
+
+// Drag-and-drop
+dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.classList.add('drag-over'); });
+dropArea.addEventListener('dragleave', ()  => dropArea.classList.remove('drag-over'));
+dropArea.addEventListener('drop', e => {
+    e.preventDefault();
+    dropArea.classList.remove('drag-over');
+    const f = e.dataTransfer?.files[0];
+    if (!f) return;
+    // Create a synthetic FileList assignment via DataTransfer so validation works uniformly
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event('change'));
+});
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+
+uploadBtn.addEventListener('click', async () => {
+    if (uploadInProgress) return;
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    uploadInProgress = true;
+    uploadBtn.disabled = true;
+    uploadBtnText.textContent = 'Uploading…';
+    uploadSpinner.style.display = 'inline-block';
+    clearUploadStatus();
+
+    try {
+        const fd = new FormData();
+        fd.append('file', file);
+
+        const res = await fetch('/documents', { method: 'POST', body: fd });
+
+        if (!res.ok) {
+            const msg = await friendlyError(res);
+            const pretty = res.status === 422
+                ? `Unsupported file type. Please upload a .pdf, .md, or .txt file.`
+                : res.status === 400
+                ? `Invalid filename: ${msg}`
+                : `Upload failed: ${msg}`;
+            showUploadStatus(pretty, 'error');
+            return;
+        }
+
+        const data = await res.json();
+        const { label, cls } = statusLabel(data.status);
+        const msg = data.status === 'unchanged'
+            ? `"${data.filename}" is already up-to-date (${data.chunks_indexed} chunks).`
+            : `"${data.filename}" ${label.toLowerCase()} — ${data.chunks_indexed} chunk(s) indexed.`;
+        showUploadStatus(msg, cls);
+
+        // Reset picker
+        fileInput.value = '';
+        selectedFileLabel.style.display = 'none';
+        uploadBtn.disabled = true;
+
+        // Refresh list
+        await loadDocuments();
+
+    } catch (err) {
+        const isNetErr = err instanceof TypeError;
+        showUploadStatus(
+            isNetErr ? 'Network error — is the server running?' : `Upload failed: ${err.message}`,
+            'error'
+        );
+    } finally {
+        uploadInProgress = false;
+        uploadBtnText.textContent = 'Upload';
+        uploadSpinner.style.display = 'none';
+    }
+});
+
+// ── Document list ─────────────────────────────────────────────────────────────
+
+async function loadDocuments() {
+    docListLoading.style.display = 'flex';
+
+    // Remove previous list/empty/error nodes (but keep loading indicator)
+    Array.from(docListSection.children).forEach(c => {
+        if (c !== docListLoading) c.remove();
+    });
+
+    try {
+        const res = await fetch('/documents');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const docs = await res.json();
+        renderDocumentList(docs);
+    } catch (err) {
+        docListLoading.style.display = 'none';
+        const errEl = el('div', 'doc-list-error');
+        errEl.appendChild(text('Could not load documents. '));
+        const retry = document.createElement('a');
+        retry.href = '#';
+        retry.textContent = 'Retry';
+        retry.style.cssText = 'color:#a78bfa;text-decoration:underline;';
+        retry.addEventListener('click', e => { e.preventDefault(); loadDocuments(); });
+        errEl.appendChild(retry);
+        docListSection.appendChild(errEl);
+    }
+}
+
+function renderDocumentList(docs) {
+    docListLoading.style.display = 'none';
+
+    // Clear old items
+    Array.from(docListSection.children).forEach(c => {
+        if (c !== docListLoading) c.remove();
+    });
+
+    if (!docs || docs.length === 0) {
+        const emptyEl = el('div', 'doc-empty');
+        emptyEl.appendChild(el('div', 'doc-empty-icon', '📭'));
+        emptyEl.appendChild(el('h3', null, 'No documents indexed yet'));
+        emptyEl.appendChild(el('p', null, 'Upload a PDF, Markdown, or text file to start asking questions.'));
+        docListSection.appendChild(emptyEl);
+        return;
+    }
+
+    docs.forEach(doc => {
+        const item = el('div', 'doc-item');
+        item.dataset.filename = doc.filename;
+
+        // Icon
+        item.appendChild(el('span', 'doc-icon', fileIcon(doc.filename)));
+
+        // Info (name + meta)
+        const info = el('div', 'doc-info');
+        const nameEl = el('div', 'doc-name');
+        nameEl.setAttribute('title', doc.filename);
+        nameEl.appendChild(text(doc.filename));
+        info.appendChild(nameEl);
+
+        const metaEl = el('div', 'doc-meta');
+        metaEl.appendChild(text(`${doc.chunk_count} chunk${doc.chunk_count !== 1 ? 's' : ''}`));
+        info.appendChild(metaEl);
+
+        item.appendChild(info);
+
+        // Delete button
+        const delBtn = document.createElement('button');
+        delBtn.className = 'doc-delete-btn';
+        delBtn.setAttribute('aria-label', `Delete ${doc.filename}`);
+        delBtn.title = `Delete ${doc.filename}`;
+        delBtn.appendChild(text('🗑'));
+        delBtn.addEventListener('click', () => openDeleteDialog(doc.filename, delBtn));
+        item.appendChild(delBtn);
+
+        docListSection.appendChild(item);
+    });
+}
+
+// ── Delete dialog ─────────────────────────────────────────────────────────────
+
+function openDeleteDialog(filename, triggerBtn) {
+    pendingDeleteName = filename;
+    dialogFilename.textContent = '';
+    dialogFilename.appendChild(text(filename));
+
+    deleteOverlay.classList.add('open');
+    dialogConfirmBtn.disabled = false;
+    dialogConfirmText.textContent = 'Delete';
+    dialogSpinner.style.display = 'none';
+
+    // Return focus to trigger when closed
+    dialogCancelBtn._trigger = triggerBtn;
+    dialogConfirmBtn.focus();
+}
+
+function closeDeleteDialog() {
+    deleteOverlay.classList.remove('open');
+    const trigger = dialogCancelBtn._trigger;
+    if (trigger) { try { trigger.focus(); } catch {} }
+    pendingDeleteName = null;
+}
+
+dialogCancelBtn.addEventListener('click', () => {
+    if (deleteInProgress) return;
+    closeDeleteDialog();
+});
+
+deleteOverlay.addEventListener('click', e => {
+    if (e.target === deleteOverlay && !deleteInProgress) closeDeleteDialog();
+});
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && deleteOverlay.classList.contains('open') && !deleteInProgress) {
+        closeDeleteDialog();
+    }
+});
+
+dialogConfirmBtn.addEventListener('click', async () => {
+    if (deleteInProgress || !pendingDeleteName) return;
+
+    deleteInProgress = true;
+    dialogConfirmBtn.disabled = true;
+    dialogConfirmText.textContent = 'Deleting…';
+    dialogSpinner.style.display = 'inline-block';
+    dialogCancelBtn.disabled = true;
+
+    const name = pendingDeleteName;
+
+    try {
+        const res = await fetch(`/documents/${encodeURIComponent(name)}`, { method: 'DELETE' });
+
+        if (!res.ok) {
+            const msg = await friendlyError(res);
+            closeDeleteDialog();
+            showUploadStatus(`Delete failed: ${msg}`, 'error');
+            return;
+        }
+
+        const data = await res.json();
+        const removed = data.chunks_deleted;
+        closeDeleteDialog();
+        showUploadStatus(
+            `"${name}" removed (${removed} chunk${removed !== 1 ? 's' : ''} deleted).`,
+            'success'
+        );
+        await loadDocuments();
+
+    } catch (err) {
+        closeDeleteDialog();
+        showUploadStatus(
+            err instanceof TypeError
+                ? 'Network error — is the server running?'
+                : `Delete failed: ${err.message}`,
+            'error'
+        );
+    } finally {
+        deleteInProgress = false;
+        dialogCancelBtn.disabled = false;
+    }
+});
+
+// ── Ask ───────────────────────────────────────────────────────────────────────
+
+questionInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) askQuestion();
+});
+
+askBtn.addEventListener('click', askQuestion);
+
+async function askQuestion() {
+    const question = questionInput.value.trim();
+    if (!question) return;
+    if (askBtn.disabled) return;
+
+    askBtn.disabled = true;
+    askLoading.style.display = 'flex';
+    resultDiv.style.display = 'none';
+    resultDiv.textContent = '';
+
+    try {
+        const res = await fetch('/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question }),
         });
 
-        async function askQuestion() {
-            const question = questionInput.value.trim();
-            if (!question) return;
+        if (!res.ok) {
+            const msg = await friendlyError(res);
+            const friendly =
+                res.status === 503 ? 'The AI service is temporarily unavailable. Please try again shortly.' :
+                res.status === 500 ? 'An internal error occurred. Check that your API key is configured correctly.' :
+                `Error: ${msg}`;
+            showAskError(friendly);
+            return;
+        }
 
-            askBtn.disabled = true;
-            loading.style.display = 'block';
-            resultDiv.style.display = 'none';
+        const data = await res.json();
+        renderResult(data);
 
-            try {
-                const res = await fetch('/ask', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question }),
-                });
+    } catch (err) {
+        showAskError(
+            err instanceof TypeError
+                ? 'Network error — is the server running?'
+                : `Something went wrong: ${err.message}`
+        );
+    } finally {
+        askBtn.disabled = false;
+        askLoading.style.display = 'none';
+    }
+}
 
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.detail || 'Request failed');
-                }
+function showAskError(message) {
+    resultDiv.textContent = '';
+    const errEl = el('div', 'ask-error');
+    errEl.appendChild(text(message));
+    resultDiv.appendChild(errEl);
+    resultDiv.style.display = 'block';
+}
 
-                const data = await res.json();
-                renderResult(data);
-            } catch (err) {
-                resultDiv.innerHTML = `<div class="error">Error: ${err.message}</div>`;
-                resultDiv.style.display = 'block';
-            } finally {
-                askBtn.disabled = false;
-                loading.style.display = 'none';
+function renderResult(data) {
+    resultDiv.textContent = '';
+
+    // Answer card
+    const card = el('div', 'answer-card');
+
+    const badge = el('div', `grounded-badge ${data.grounded ? 'grounded-true' : 'grounded-false'}`);
+    badge.appendChild(text(data.grounded ? '● Grounded' : '○ Not Grounded'));
+    card.appendChild(badge);
+
+    const answerEl = el('div', 'answer-text');
+    answerEl.appendChild(text(data.answer || ''));
+    card.appendChild(answerEl);
+
+    resultDiv.appendChild(card);
+
+    // Citations
+    if (data.citations && data.citations.length > 0) {
+        const citHeader = el('div', 'citations-header');
+        citHeader.appendChild(text(`Sources (${data.citations.length})`));
+        resultDiv.appendChild(citHeader);
+
+        data.citations.forEach(c => {
+            const cit = el('div', 'citation');
+
+            const src = el('div', 'citation-source');
+            src.appendChild(text(c.source));
+            if (c.chunk_id) {
+                src.appendChild(text(' — '));
+                const chunkSpan = el('span', null, c.chunk_id);
+                chunkSpan.style.cssText = 'color:#6b7280;font-weight:400;';
+                src.appendChild(chunkSpan);
             }
-        }
+            cit.appendChild(src);
 
-        function renderResult(data) {
-            const badgeClass = data.grounded ? 'grounded-true' : 'grounded-false';
-            const badgeText = data.grounded ? '● Grounded' : '○ Not Grounded';
-
-            let html = `
-                <div class="answer-card">
-                    <span class="grounded-badge ${badgeClass}">${badgeText}</span>
-                    <div class="answer-text">${escapeHtml(data.answer)}</div>
-                </div>
-            `;
-
-            if (data.citations && data.citations.length > 0) {
-                html += `<div class="citations-header">Sources (${data.citations.length})</div>`;
-                for (const c of data.citations) {
-                    html += `
-                        <div class="citation">
-                            <div class="citation-source">${escapeHtml(c.source)} — ${escapeHtml(c.chunk_id)}</div>
-                            <div class="citation-text">${escapeHtml(c.quote || '')}</div>
-                        </div>
-                    `;
-                }
+            if (c.quote) {
+                const qt = el('div', 'citation-text');
+                qt.appendChild(text(c.quote));
+                cit.appendChild(qt);
             }
 
-            resultDiv.innerHTML = html;
-            resultDiv.style.display = 'block';
-        }
+            resultDiv.appendChild(cit);
+        });
+    }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-    </script>
+    resultDiv.style.display = 'block';
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+loadDocuments();
+</script>
 </body>
 </html>
