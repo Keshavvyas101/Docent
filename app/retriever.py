@@ -22,14 +22,8 @@ def _get_model() -> SentenceTransformer:
 
 
 def _get_client() -> QdrantClient:
-    global _client
-    if _client is None:
-        import app.config as cfg
-        if cfg.QDRANT_URL:
-            _client = QdrantClient(url=cfg.QDRANT_URL)
-        else:
-            _client = QdrantClient(path=str(cfg.QDRANT_PATH))
-    return _client
+    from app.ingest import get_qdrant_client
+    return get_qdrant_client()
 
 
 def retrieve(question: str, top_k: int | None = None) -> list[dict]:
