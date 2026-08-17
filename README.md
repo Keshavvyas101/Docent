@@ -145,15 +145,58 @@ Open http://localhost:8000/docs in your browser.
 
 ### Evaluation & Benchmarking
 
-Run the deterministic retrieval benchmark against the golden evaluation set:
+Docent provides two evaluation harnesses to rigorously measure both **retrieval quality** and **generated answer fidelity**.
+
+#### 1. Retrieval Quality Benchmark
+
+Evaluates whether the vector database retriever retrieves the correct context document in its top-4 results:
 
 ```bash
 python eval/evaluate_retrieval.py
 ```
 
-Current Baseline Performance:
-- **Hit Rate @ 4**: 100.00% (18/18 answerable questions)
-- **Layer 1 Refusal**: 75.00% (3/4 unanswerable questions)
+- **Historical Baseline Set (`golden_set.json`)**:
+  - **Hit Rate @ 4**: 100.00% (18/18 answerable questions)
+  - **MRR @ 4**: 0.9583
+  - **Layer 1 Refusal Rate**: 75.00% (3/4 unanswerable questions)
+
+- **Held-Out Test Set (`held_out_set.json`)**:
+  - **Hit Rate @ 4**: 80.00% (8/10 answerable questions)
+  - **MRR @ 4**: 0.8000
+  - **Layer 1 Refusal Rate**: 33.33% (2/6 unanswerable questions)
+
+#### 2. RAG Answer-Level Evaluation Benchmark
+
+Evaluates generated answer fidelity, exact verbatim citation verification, refusal correctness, and LLM-based Faithfulness & Relevance using Gemini-as-a-Judge:
+
+```bash
+# Evaluate local Qdrant instance or embedded storage
+QDRANT_URL=http://localhost:6333 python eval/evaluate_answers.py
+```
+
+- **Deterministic Verification Checks**:
+  - **Sub-string Verbatim Check**: Validates that cited text quotes exist verbatim inside retrieved chunk payload text.
+  - **Citation Structure Validation**: Confirms citations strictly conform to expected `Citation` schema without hallucinated or empty fields.
+  - **Refusal Correctness**: Verifies unsupported or unanswerable queries are safely refused (`grounded == False`, `citations == []`).
+
+- **Gemini-as-a-Judge (Faithfulness & Relevance)**:
+  - **Faithfulness (0.0–1.0)**: Measures whether the generated answer is strictly grounded in and derived from the retrieved context.
+  - **Relevance (0.0–1.0)**: Measures whether the answer directly addresses the user's question without extraneous information.
+
+- **Current Answer Evaluation Results**:
+
+| Metric | Baseline Set (`golden_set.json`) | Held-Out Set (`held_out_set.json`) |
+|---|---|---|
+| **Average Faithfulness (Judge)** | **1.0000** | **1.0000** |
+| **Average Relevance (Judge)** | **1.0000** | **1.0000** |
+| **Citation Verbatim Pass Rate** | 73.68% (14/19) | 66.67% (4/6) |
+| **Citation Structure Pass Rate** | 100.00% (17/17) | 100.00% (6/6) |
+| **Refusal Correctness** | 100.00% (4/4) | 100.00% (6/6) |
+| **Judge Errors / Failures** | 0 | 0 |
+
+> [!NOTE]
+> **Limitations of LLM-as-a-Judge**:
+> LLM-as-a-Judge provides an automated evaluation signal for generation quality, but is not an absolute ground truth. LLM judges can occasionally exhibit positional bias, self-enhancement bias, or mild leniency on surface phrasing. For high-stakes applications, LLM-as-a-Judge should be paired with deterministic quote verification and human spot audits.
 
 ## Project Structure
 
@@ -175,12 +218,16 @@ docent/
 │   ├── chunking_and_embedding.md
 │   └── security_policy.pdf
 ├── eval/
-│   ├── golden_set.json      # 22 evaluation questions
-│   └── evaluate_retrieval.py # Hit Rate @ 4 benchmark runner
+│   ├── golden_set.json      # 22 baseline evaluation questions
+│   ├── held_out_set.json   # 16 held-out evaluation questions
+│   ├── evaluate_retrieval.py # Hit Rate @ 4 & MRR @ 4 benchmark runner
+│   └── evaluate_answers.py   # Answer quality, verbatim quotes & Gemini-as-a-Judge harness
 ├── static/
 │   └── index.html           # Minimal dark-theme UI
 ├── qdrant_storage/          # Persistent Qdrant local storage
 ├── docker-compose.yml       # Qdrant vector database container setup
+├── Dockerfile               # Production container image definition
+├── .dockerignore
 ├── .env                     # API keys (not committed)
 ├── .env.example             # Template for .env
 ├── .gitignore
